@@ -1,0 +1,498 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Link } from "react-router-dom";
+import { 
+  ArrowRight, Building2, Package, Users, Zap, Shield, BarChart3,
+  Target, Award, Globe, Mail, Phone, MapPin, Send, CheckCircle
+} from "lucide-react";
+
+const Landing = () => {
+  const [contactForm, setContactForm] = useState({ name: '', email: '', company: '', message: '' });
+  const [formSubmitted, setFormSubmitted] = useState(false);
+
+  const handleContactSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Simulate form submission
+    setFormSubmitted(true);
+    setTimeout(() => {
+      setFormSubmitted(false);
+      setContactForm({ name: '', email: '', company: '', message: '' });
+    }, 3000);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 gradient-hero rounded-lg flex items-center justify-center">
+              <Package className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="font-display font-bold text-xl text-foreground">BlueView</span>
+          </div>
+          
+          <div className="hidden md:flex items-center gap-8">
+            <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</a>
+            <a href="#about" className="text-muted-foreground hover:text-foreground transition-colors">About</a>
+            <a href="#contact" className="text-muted-foreground hover:text-foreground transition-colors">Contact</a>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link to="/auth">
+              <Button variant="ghost">Sign In</Button>
+            </Link>
+            <Link to="/auth">
+              <Button variant="hero">Get Started</Button>
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section className="pt-32 pb-20 px-6">
+        <div className="container mx-auto max-w-6xl">
+          <div className="text-center space-y-6 animate-fade-up">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
+              <Zap className="w-4 h-4" />
+              Streamline Your Manufacturing Operations
+            </div>
+            
+            <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight">
+              Manage Materials with
+              <span> Precision</span>
+            </h1>
+            
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+              BlueView helps manufacturing companies track materials, connect with partners, 
+              and optimize their supply chain — all in one powerful platform.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <Link to="/auth">
+                <Button variant="hero" size="xl" className="group">
+                  Start Free Trial
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+              <Button variant="hero-outline" size="xl">
+                Watch Demo
+              </Button>
+            </div>
+          </div>
+
+          {/* Hero Visual */}
+          <div className="mt-16 relative animate-fade-up" style={{ animationDelay: "0.2s" }}>
+            <div className="absolute inset-0 gradient-hero opacity-5 rounded-3xl blur-3xl" />
+            <div className="relative bg-card rounded-2xl shadow-2xl border border-border overflow-hidden">
+              <div className="h-12 bg-muted/50 flex items-center px-4 gap-2 border-b border-border">
+                <div className="w-3 h-3 rounded-full bg-destructive/60" />
+                <div className="w-3 h-3 rounded-full bg-accent/60" />
+                <div className="w-3 h-3 rounded-full bg-primary/60" />
+              </div>
+              <div className="p-6 md:p-8 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h3 className="font-display font-semibold text-lg">Materials Dashboard</h3>
+                    <p className="text-sm text-muted-foreground">Real-time inventory overview</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">Live</div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: "Total Materials", value: "2,847", change: "+12%" },
+                    { label: "Active Partners", value: "156", change: "+8%" },
+                    { label: "Monthly Orders", value: "1,024", change: "+23%" },
+                  ].map((stat, i) => (
+                    <div key={i} className="p-4 rounded-xl bg-muted/50 border border-border">
+                      <p className="text-xs text-muted-foreground">{stat.label}</p>
+                      <p className="text-2xl font-display font-bold text-foreground">{stat.value}</p>
+                      <span className="text-xs text-primary font-medium">{stat.change}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="h-32 bg-muted/30 rounded-xl border border-border flex items-center justify-center">
+                  <BarChart3 className="w-16 h-16 text-muted-foreground/30" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-20 px-6 bg-muted/30">
+        <div className="container mx-auto max-w-6xl">
+          <div className="text-center space-y-4 mb-16">
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+              Everything You Need to Succeed
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Powerful tools designed specifically for manufacturing companies
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                icon: Package,
+                title: "Material Tracking",
+                description: "Track all your materials in real-time with detailed inventory management and automatic alerts."
+              },
+              {
+                icon: Users,
+                title: "Partner Network",
+                description: "Connect with suppliers and partners seamlessly. Share data and collaborate efficiently."
+              },
+              {
+                icon: Building2,
+                title: "Multi-Company Support",
+                description: "Manage multiple locations and subsidiaries from a single dashboard."
+              },
+              {
+                icon: BarChart3,
+                title: "Analytics & Reports",
+                description: "Get insights with powerful analytics and customizable reports for better decisions."
+              },
+              {
+                icon: Shield,
+                title: "Enterprise Security",
+                description: "Bank-level encryption and compliance with industry standards to protect your data."
+              },
+              {
+                icon: Zap,
+                title: "Fast Integration",
+                description: "Quick setup with existing ERP systems and seamless API integration."
+              }
+            ].map((feature, i) => (
+              <div 
+                key={i} 
+                className="group p-6 rounded-2xl bg-card border border-border hover-lift cursor-pointer"
+              >
+                <div className="w-12 h-12 rounded-xl gradient-hero flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <feature.icon className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <h3 className="font-display font-semibold text-lg text-foreground mb-2">{feature.title}</h3>
+                <p className="text-muted-foreground text-sm">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* About Section */}
+      <section id="about" className="py-20 px-6">
+        <div className="container mx-auto max-w-6xl">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left - Content */}
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 text-accent text-sm font-medium">
+                <Target className="w-4 h-4" />
+                Our Mission
+              </div>
+              <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+                Empowering Manufacturers to Build the Future
+              </h2>
+              <p className="text-muted-foreground text-lg leading-relaxed">
+                Founded in 2024, BlueView was born from a simple observation: manufacturing supply chains 
+                are too complex, too slow, and too expensive. We're changing that by connecting buyers 
+                and suppliers on a single, intelligent platform.
+              </p>
+              <p className="text-muted-foreground leading-relaxed">
+                Our team of industry veterans and technologists have worked at leading manufacturing 
+                companies, tech giants, and innovative startups. We understand the challenges you face 
+                because we've lived them.
+              </p>
+              
+              <div className="grid grid-cols-3 gap-6 pt-4">
+                {[
+                  { value: "500+", label: "Companies" },
+                  { value: "$2B+", label: "Materials Traded" },
+                  { value: "99.9%", label: "Uptime" },
+                ].map((stat, i) => (
+                  <div key={i}>
+                    <p className="text-2xl md:text-3xl font-display font-bold text-primary">{stat.value}</p>
+                    <p className="text-sm text-muted-foreground">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right - Values */}
+            <div className="space-y-4">
+              {[
+                {
+                  icon: Target,
+                  title: "Precision First",
+                  description: "Every feature is designed with accuracy and reliability in mind. Your data integrity is our top priority."
+                },
+                {
+                  icon: Award,
+                  title: "Industry Expertise",
+                  description: "Built by manufacturing experts who understand the nuances of procurement, inventory, and supply chain management."
+                },
+                {
+                  icon: Globe,
+                  title: "Global Scale",
+                  description: "Connect with suppliers worldwide. Our platform supports multi-currency, multi-language, and international compliance."
+                },
+              ].map((value, i) => (
+                <div 
+                  key={i} 
+                  className="flex gap-4 p-5 rounded-xl bg-card border border-border hover:border-primary/50 transition-colors"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                    <value.icon className="w-6 h-6 text-accent" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-semibold text-foreground mb-1">{value.title}</h3>
+                    <p className="text-sm text-muted-foreground">{value.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact Section */}
+      <section id="contact" className="py-20 px-6 bg-muted/30">
+        <div className="container mx-auto max-w-6xl">
+          <div className="text-center space-y-4 mb-12">
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+              Get in Touch
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-5 gap-8">
+            {/* Contact Info */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="p-6 rounded-2xl bg-card border border-border">
+                <h3 className="font-display font-semibold text-lg text-foreground mb-4">Contact Information</h3>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg gradient-hero flex items-center justify-center flex-shrink-0">
+                      <Mail className="w-5 h-5 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Email</p>
+                      <a href="mailto:hello@blueview.io" className="font-medium text-foreground hover:text-primary transition-colors">
+                        hello@blueview.io
+                      </a>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg gradient-hero flex items-center justify-center flex-shrink-0">
+                      <Phone className="w-5 h-5 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Phone</p>
+                      <a href="tel:+18005551234" className="font-medium text-foreground hover:text-primary transition-colors">
+                        +1 (800) 555-1234
+                      </a>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg gradient-hero flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-5 h-5 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Office</p>
+                      <p className="font-medium text-foreground">
+                        100 Innovation Way<br />
+                        San Francisco, CA 94107
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-accent/10 border border-accent/20">
+                <h3 className="font-display font-semibold text-foreground mb-2">Enterprise Sales</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Looking for custom solutions for your organization? Our enterprise team can help.
+                </p>
+                <Button variant="outline" className="border-accent text-accent hover:bg-accent/10">
+                  Schedule a Demo
+                </Button>
+              </div>
+            </div>
+
+            {/* Contact Form */}
+            <div className="lg:col-span-3">
+              <form onSubmit={handleContactSubmit} className="p-6 rounded-2xl bg-card border border-border">
+                <h3 className="font-display font-semibold text-lg text-foreground mb-6">Send us a Message</h3>
+                
+                {formSubmitted ? (
+                  <div className="py-12 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/10 flex items-center justify-center">
+                      <CheckCircle className="w-8 h-8 text-green-500" />
+                    </div>
+                    <h4 className="font-display font-semibold text-lg text-foreground mb-2">Message Sent!</h4>
+                    <p className="text-muted-foreground">We'll get back to you within 24 hours.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Name</label>
+                        <Input 
+                          placeholder="John Smith"
+                          value={contactForm.name}
+                          onChange={(e) => setContactForm(prev => ({ ...prev, name: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Email</label>
+                        <Input 
+                          type="email"
+                          placeholder="john@company.com"
+                          value={contactForm.email}
+                          onChange={(e) => setContactForm(prev => ({ ...prev, email: e.target.value }))}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Company</label>
+                      <Input 
+                        placeholder="Your company name"
+                        value={contactForm.company}
+                        onChange={(e) => setContactForm(prev => ({ ...prev, company: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Message</label>
+                      <Textarea 
+                        placeholder="How can we help you?"
+                        rows={5}
+                        value={contactForm.message}
+                        onChange={(e) => setContactForm(prev => ({ ...prev, message: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" variant="hero" className="w-full">
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Message
+                    </Button>
+                  </div>
+                )}
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 px-6">
+        <div className="container mx-auto max-w-4xl">
+          <div className="gradient-hero rounded-3xl p-8 md:p-12 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.1),transparent)]" />
+            <div className="relative space-y-6">
+              <h2 className="font-display text-3xl md:text-4xl font-bold text-primary-foreground">
+                Ready to Transform Your Operations?
+              </h2>
+              <p className="text-primary-foreground/80 max-w-xl mx-auto">
+                Join hundreds of manufacturing companies already using BlueView to streamline their operations.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link to="/auth">
+                  <Button variant="secondary" size="lg" className="font-semibold">
+                    Start Free Trial
+                  </Button>
+                </Link>
+                <a href="#contact">
+                  <Button variant="ghost" size="lg" className="text-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/10">
+                    Contact Sales
+                  </Button>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-16 px-6 border-t border-border bg-card">
+        <div className="container mx-auto max-w-6xl">
+          <div className="grid md:grid-cols-4 gap-8 mb-12">
+            {/* Brand */}
+            <div className="md:col-span-1">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 gradient-hero rounded-lg flex items-center justify-center">
+                  <Package className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <span className="font-display font-bold text-lg text-foreground">BlueView</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                The modern platform for manufacturing materials management and procurement.
+              </p>
+            </div>
+
+            {/* Product */}
+            <div>
+              <h4 className="font-display font-semibold text-foreground mb-4">Product</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Integrations</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">API</a></li>
+              </ul>
+            </div>
+
+            {/* Company */}
+            <div>
+              <h4 className="font-display font-semibold text-foreground mb-4">Company</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#about" className="text-muted-foreground hover:text-foreground transition-colors">About Us</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Careers</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Blog</a></li>
+                <li><a href="#contact" className="text-muted-foreground hover:text-foreground transition-colors">Contact</a></li>
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div>
+              <h4 className="font-display font-semibold text-foreground mb-4">Legal</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Terms of Service</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Cookie Policy</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Security</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              © 2026 BlueView. All rights reserved.
+            </p>
+            <div className="flex items-center gap-6">
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg>
+              </a>
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+              </a>
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default Landing;

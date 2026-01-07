@@ -10,6 +10,19 @@ type LineItemPayload = {
   materialId: number;
   quantity: number;
   proposedUnitPrice: number;
+  itemNote?: string;
+  urgency?: 'standard' | 'expedited' | 'rush';
+};
+
+type BidTerms = {
+  buyerEmail?: string;
+  buyerPhone?: string;
+  deliveryPreference?: string;
+  deliveryDate?: string;
+  paymentTerms?: string;
+  shippingAddress?: string;
+  bidJustification?: string;
+  specialRequirements?: string;
 };
 
 const calculateTotal = (lineItems: LineItemPayload[]) =>
@@ -56,10 +69,11 @@ router.get('/:id', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { companyId, buyerName, lineItems } = req.body as {
+  const { companyId, buyerName, lineItems, terms } = req.body as {
     companyId: number;
     buyerName: string;
     lineItems: LineItemPayload[];
+    terms?: BidTerms;
   };
 
   if (!companyId || !buyerName || !Array.isArray(lineItems) || lineItems.length === 0) {
@@ -71,19 +85,44 @@ router.post('/', (req, res) => {
 
   const transaction = db.transaction(() => {
     const bidResult = db
-      .prepare(
-        'INSERT INTO bids (companyId, buyerName, status, totalAmount, createdAt) VALUES (?, ?, ?, ?, ?)'
-      )
-      .run(companyId, buyerName, 'draft', totalAmount, createdAt);
+      .prepare(`
+        INSERT INTO bids (
+          companyId, buyerName, buyerEmail, buyerPhone, status, totalAmount,
+          deliveryPreference, deliveryDate, paymentTerms, shippingAddress,
+          bidJustification, specialRequirements, createdAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .run(
+        companyId,
+        buyerName,
+        terms?.buyerEmail || null,
+        terms?.buyerPhone || null,
+        'draft',
+        totalAmount,
+        terms?.deliveryPreference || 'standard',
+        terms?.deliveryDate || null,
+        terms?.paymentTerms || 'net30',
+        terms?.shippingAddress || null,
+        terms?.bidJustification || null,
+        terms?.specialRequirements || null,
+        createdAt
+      );
 
     const bidId = bidResult.lastInsertRowid as number;
 
     const insertLine = db.prepare(
-      'INSERT INTO bid_line_items (bidId, materialId, quantity, proposedUnitPrice) VALUES (?, ?, ?, ?)'
+      'INSERT INTO bid_line_items (bidId, materialId, quantity, proposedUnitPrice, itemNote, urgency) VALUES (?, ?, ?, ?, ?, ?)'
     );
 
     for (const item of lineItems) {
-      insertLine.run(bidId, item.materialId, item.quantity, item.proposedUnitPrice);
+      insertLine.run(
+        bidId,
+        item.materialId,
+        item.quantity,
+        item.proposedUnitPrice,
+        item.itemNote || null,
+        item.urgency || 'standard'
+      );
     }
 
     return bidId;
@@ -140,6 +179,47 @@ router.post('/:id/submit', (req, res) => {
 
   db.prepare('UPDATE bids SET status = ? WHERE id = ?').run('submitted', bidId);
   res.json({ bidId, status: 'submitted' });
+});
+
+// Seller respond to bid (accept/reject/counter)
+router.post('/:id/respond', (req, res) => {
+  const bidId = Number(req.params.id);
+  const { action, sellerResponse } = req.body as {
+    action: 'accept' | 'reject' | 'counter';
+    sellerResponse?: string;
+  };
+
+  const existing = getBidStatus(bidId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Bid not found' });
+  }
+
+  if (existing.status !== 'submitted') {
+    return res.status(400).json({ error: 'Can only respond to submitted bids' });
+  }
+
+  const newStatus = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'countered';
+  
+  db.prepare('UPDATE bids SET status = ?, sellerResponse = ? WHERE id = ?')
+    .run(newStatus, sellerResponse || null, bidId);
+  
+  res.json({ bidId, status: newStatus, sellerResponse });
+});
+
+// Update seller response / notes
+router.put('/:id/seller-notes', (req, res) => {
+  const bidId = Number(req.params.id);
+  const { sellerResponse } = req.body as { sellerResponse: string };
+
+  const existing = getBidStatus(bidId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Bid not found' });
+  }
+
+  db.prepare('UPDATE bids SET sellerResponse = ? WHERE id = ?')
+    .run(sellerResponse || null, bidId);
+  
+  res.json({ bidId, sellerResponse });
 });
 
 export default router;

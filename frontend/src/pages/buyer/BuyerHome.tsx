@@ -1,0 +1,355 @@
+import { useState, useEffect, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Link } from "react-router-dom";
+import { Search, Package, Users, Building2, ChevronDown, LogOut, Settings, User, Plus, Sparkles, ShoppingCart } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { fetchCompanies, fetchMaterials, type Company, type Material } from "@/lib/api";
+
+const BuyerHome = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [companiesData, materialsData] = await Promise.all([
+          fetchCompanies(),
+          fetchMaterials()
+        ]);
+        setCompanies(companiesData);
+        setMaterials(materialsData);
+      } catch (error) {
+        console.error("Failed to load data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const materialTypes = useMemo(() => {
+    return Array.from(new Set(materials.map((m) => m.type)));
+  }, [materials]);
+
+  const filteredMaterials = useMemo(() => {
+    return materials.filter((m) => {
+      const matchesSearch = searchTerm === "" ||
+        m.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.type.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesCategory = categoryFilter === "all" || m.type === categoryFilter;
+      const matchesCompany = companyFilter === "all" || m.companyId === Number(companyFilter);
+      
+      return matchesSearch && matchesCategory && matchesCompany;
+    });
+  }, [materials, searchTerm, categoryFilter, companyFilter]);
+
+  const stats = useMemo(() => ({
+    totalMaterials: materials.length,
+    activePartners: companies.length,
+    totalStock: materials.reduce((sum, m) => sum + m.stock, 0)
+  }), [materials, companies]);
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
+        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link to="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 gradient-hero rounded-lg flex items-center justify-center">
+                <ShoppingCart className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <span className="font-display font-bold text-xl text-foreground">BlueView</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Buyer</span>
+            </Link>
+
+            <div className="hidden md:flex items-center gap-1">
+              <Link to="/buyer/companies">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Companies
+                </Button>
+              </Link>
+              <span className="text-border">|</span>
+              <Button variant="ghost" className="text-primary font-medium">
+                <Package className="w-4 h-4 mr-2" />
+                Materials
+              </Button>
+              <span className="text-border">|</span>
+              <Link to="/buyer/bids">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Bid Builder
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="flex items-center gap-3 px-3">
+                <span className="text-sm font-medium">Buyer Account</span>
+                <div className="w-9 h-9 rounded-full gradient-hero flex items-center justify-center">
+                  <User className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem>
+                <User className="w-4 h-4 mr-2" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/auth" className="flex items-center text-destructive">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-6 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
+            Material Inventory
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Browse and search materials from your partner network
+          </p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {[
+            { label: "Total Materials", value: stats.totalMaterials.toLocaleString(), icon: Package, color: "primary" },
+            { label: "Partner Companies", value: stats.activePartners.toLocaleString(), icon: Users, color: "accent" },
+            { label: "Total Stock", value: stats.totalStock.toLocaleString(), icon: Building2, color: "primary" },
+          ].map((stat, i) => (
+            <div key={i} className="p-5 rounded-xl bg-card border border-border hover-lift">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">{stat.label}</p>
+                  <p className="text-2xl font-display font-bold text-foreground mt-1">{stat.value}</p>
+                </div>
+                <div className={`w-12 h-12 rounded-xl ${stat.color === 'accent' ? 'bg-accent' : 'gradient-hero'} flex items-center justify-center`}>
+                  <stat.icon className={`w-6 h-6 ${stat.color === 'accent' ? 'text-accent-foreground' : 'text-primary-foreground'}`} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Search & Filter */}
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full sm:w-40 bg-card">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {materialTypes.map((type) => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={companyFilter} onValueChange={setCompanyFilter}>
+              <SelectTrigger className="w-full sm:w-48 bg-card">
+                <SelectValue placeholder="Company" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Companies</SelectItem>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={String(company.id)}>{company.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by company, material, or type..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-card"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Materials Table */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-md">
+          {loading ? (
+            <div className="h-64 flex items-center justify-center text-muted-foreground">
+              Loading materials...
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                  <TableHead className="font-display font-semibold text-foreground">Company</TableHead>
+                  <TableHead className="font-display font-semibold text-foreground">Material</TableHead>
+                  <TableHead className="font-display font-semibold text-foreground">Type</TableHead>
+                  <TableHead className="font-display font-semibold text-foreground">Stock</TableHead>
+                  <TableHead className="font-display font-semibold text-foreground">Per Unit</TableHead>
+                  <TableHead className="font-display font-semibold text-foreground">Lead Time</TableHead>
+                  <TableHead className="font-display font-semibold text-foreground"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredMaterials.length > 0 ? (
+                  filteredMaterials.map((material, index) => (
+                    <TableRow 
+                      key={material.id}
+                      className="hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => {
+                        const company = companies.find(c => c.id === material.companyId);
+                        if (company) setSelectedCompany(company);
+                      }}
+                    >
+                      <TableCell className="font-medium text-foreground">{material.companyName}</TableCell>
+                      <TableCell>
+                        <div>
+                          <span className="font-medium text-foreground">{material.name}</span>
+                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">{material.description}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                          {material.type}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{material.stock.toLocaleString()}</TableCell>
+                      <TableCell className="font-medium text-foreground">${material.baseUnitPrice.toFixed(2)}</TableCell>
+                      <TableCell className="text-muted-foreground">{material.leadTimeDays} days</TableCell>
+                      <TableCell>
+                        <Link to={`/buyer/bids?materialId=${material.id}`} onClick={(e) => e.stopPropagation()}>
+                          <Button size="sm" variant="outline" className="h-8">
+                            <Plus className="w-3 h-3 mr-1" />
+                            Add to Bid
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                      No materials found matching your search.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+
+        {/* Results info */}
+        <div className="mt-4 text-sm text-muted-foreground">
+          Showing {filteredMaterials.length} of {materials.length} materials
+        </div>
+      </main>
+
+      {/* Company Details Dialog */}
+      <Dialog open={!!selectedCompany} onOpenChange={(open) => !open && setSelectedCompany(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">{selectedCompany?.name}</DialogTitle>
+            <DialogDescription>{selectedCompany?.description}</DialogDescription>
+          </DialogHeader>
+          {selectedCompany && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Location</p>
+                  <p className="font-medium">{selectedCompany.location}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Phone</p>
+                  <p className="font-medium">{selectedCompany.phone}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-sm text-muted-foreground">Email</p>
+                  <p className="font-medium">{selectedCompany.email}</p>
+                </div>
+              </div>
+              <div className="pt-4 border-t">
+                <p className="text-sm text-muted-foreground mb-2">Materials from this company</p>
+                <p className="text-2xl font-display font-bold text-primary">
+                  {materials.filter(m => m.companyId === selectedCompany.id).length} items
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => {
+                    setCompanyFilter(String(selectedCompany.id));
+                    setSelectedCompany(null);
+                  }}
+                >
+                  View Materials
+                </Button>
+                <Link to={`/buyer/bids?companyId=${selectedCompany.id}`} className="flex-1">
+                  <Button className="w-full gradient-hero text-primary-foreground">
+                    Start Bid
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default BuyerHome;
+

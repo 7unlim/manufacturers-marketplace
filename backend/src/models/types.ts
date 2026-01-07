@@ -39,3 +39,4 @@ export interface BidPackage {
   lineItems: Array<BidLineItem & { materialName: string; materialType: string }>;
 }
 
+

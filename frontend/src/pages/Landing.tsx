@@ -1,16 +1,39 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "react-router-dom";
 import { 
   ArrowRight, Building2, Package, Users, Zap, Shield, BarChart3,
-  Target, Award, Globe, Mail, Phone, MapPin, Send, CheckCircle
+  Target, Award, Globe, Mail, Phone, MapPin, Send, CheckCircle, TrendingUp, Inbox, DollarSign
 } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+
+// Mock revenue data for the chart
+const generateRevenueData = () => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  let value = 45000;
+  return months.map((month) => {
+    value = value + Math.random() * 8000 - 2000;
+    value = Math.max(value, 30000);
+    return { month, revenue: Math.round(value) };
+  });
+};
 
 const Landing = () => {
   const [contactForm, setContactForm] = useState({ name: '', email: '', company: '', message: '' });
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [revenueData] = useState(generateRevenueData);
+  const [chartPeriod, setChartPeriod] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>('1Y');
+  
+  const filteredChartData = useMemo(() => {
+    const sliceMap = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12, 'ALL': 12 };
+    return revenueData.slice(-sliceMap[chartPeriod]);
+  }, [revenueData, chartPeriod]);
+  const currentRevenue = revenueData[revenueData.length - 1]?.revenue || 0;
+  const previousRevenue = revenueData[revenueData.length - 2]?.revenue || 0;
+  const revenueChange = previousRevenue ? ((currentRevenue - previousRevenue) / previousRevenue * 100).toFixed(1) : '0';
+  const isPositive = Number(revenueChange) >= 0;
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,14 +78,8 @@ const Landing = () => {
       <section className="pt-32 pb-20 px-6">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center space-y-6 animate-fade-up">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
-              <Zap className="w-4 h-4" />
-              Streamline Your Manufacturing Operations
-            </div>
-            
             <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight">
-              Manage Materials with
-              <span> Precision</span>
+              Manage Materials with Precision
             </h1>
             
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
@@ -83,7 +100,7 @@ const Landing = () => {
             </div>
           </div>
 
-          {/* Hero Visual */}
+          {/* Hero Visual - Dashboard Preview */}
           <div className="mt-16 relative animate-fade-up" style={{ animationDelay: "0.2s" }}>
             <div className="absolute inset-0 gradient-hero opacity-5 rounded-3xl blur-3xl" />
             <div className="relative bg-card rounded-2xl shadow-2xl border border-border overflow-hidden">
@@ -92,7 +109,7 @@ const Landing = () => {
                 <div className="w-3 h-3 rounded-full bg-accent/60" />
                 <div className="w-3 h-3 rounded-full bg-primary/60" />
               </div>
-              <div className="p-6 md:p-8 space-y-4">
+              <div className="p-6 md:p-8 space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <h3 className="font-display font-semibold text-lg">Materials Dashboard</h3>
@@ -102,23 +119,125 @@ const Landing = () => {
                     <div className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">Live</div>
                   </div>
                 </div>
+
+                {/* Revenue Chart */}
+                <div className="rounded-xl bg-muted/30 border border-border p-4">
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Revenue</p>
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-2xl md:text-3xl font-display font-bold text-foreground">
+                          ${currentRevenue.toLocaleString()}
+                        </span>
+                        <span className={`flex items-center text-sm font-medium ${isPositive ? 'text-green-500' : 'text-destructive'}`}>
+                          <TrendingUp className={`w-4 h-4 mr-1 ${!isPositive && 'rotate-180'}`} />
+                          {isPositive ? '+' : ''}{revenueChange}%
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">Past 12 months</p>
+                    </div>
+                    <div className="flex gap-1">
+                      {(['1M', '3M', '6M', '1Y', 'ALL'] as const).map((period) => (
+                        <button
+                          key={period}
+                          onClick={() => setChartPeriod(period)}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                            chartPeriod === period 
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                          }`}
+                        >
+                          {period}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="h-[180px] md:h-[200px] -mx-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={filteredChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="hsl(38 92% 50%)" stopOpacity={0.3} />
+                            <stop offset="100%" stopColor="hsl(38 92% 50%)" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis 
+                          dataKey="month" 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 12, fill: 'hsl(215 16% 47%)' }}
+                          dy={10}
+                        />
+                        <YAxis 
+                          hide
+                          domain={['dataMin - 5000', 'dataMax + 5000']}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                            fontSize: '12px'
+                          }}
+                          formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
+                          labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="revenue"
+                          stroke="hsl(38 92% 50%)"
+                          strokeWidth={2}
+                          fill="url(#revenueGradient)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
                 
-                <div className="grid grid-cols-3 gap-4">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    { label: "Total Materials", value: "2,847", change: "+12%" },
-                    { label: "Active Partners", value: "156", change: "+8%" },
-                    { label: "Monthly Orders", value: "1,024", change: "+23%" },
+                    { 
+                      label: "Total Materials", 
+                      value: "2,847", 
+                      change: "+12%",
+                      icon: Package, 
+                      color: "accent"
+                    },
+                    { 
+                      label: "Active Partners", 
+                      value: "156", 
+                      change: "+8%",
+                      icon: Users, 
+                      color: "primary" 
+                    },
+                    { 
+                      label: "Monthly Orders", 
+                      value: "1,024", 
+                      change: "+23%",
+                      icon: Inbox, 
+                      color: "accent"
+                    },
+                    { 
+                      label: "Inventory Value", 
+                      value: "$2.4M", 
+                      change: "+15%",
+                      icon: DollarSign, 
+                      color: "primary" 
+                    },
                   ].map((stat, i) => (
                     <div key={i} className="p-4 rounded-xl bg-muted/50 border border-border">
-                      <p className="text-xs text-muted-foreground">{stat.label}</p>
-                      <p className="text-2xl font-display font-bold text-foreground">{stat.value}</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs text-muted-foreground">{stat.label}</p>
+                        <div className={`w-8 h-8 rounded-lg ${stat.color === 'accent' ? 'bg-accent' : 'gradient-hero'} flex items-center justify-center`}>
+                          <stat.icon className={`w-4 h-4 ${stat.color === 'accent' ? 'text-accent-foreground' : 'text-primary-foreground'}`} />
+                        </div>
+                      </div>
+                      <p className="text-xl font-display font-bold text-foreground">{stat.value}</p>
                       <span className="text-xs text-primary font-medium">{stat.change}</span>
                     </div>
                   ))}
-                </div>
-
-                <div className="h-32 bg-muted/30 rounded-xl border border-border flex items-center justify-center">
-                  <BarChart3 className="w-16 h-16 text-muted-foreground/30" />
                 </div>
               </div>
             </div>
@@ -186,7 +305,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* About Section */}
+      {/* Mission Section */}
       <section id="about" className="py-20 px-6">
         <div className="container mx-auto max-w-6xl">
           <div className="grid lg:grid-cols-2 gap-12 items-center">

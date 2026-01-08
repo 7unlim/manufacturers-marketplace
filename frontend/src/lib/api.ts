@@ -15,11 +15,13 @@ export type Company = {
   email: string;
   location: string;
   description: string;
+  certifications?: string; // JSON string of certifications array
 };
 
 export type Material = {
   id: number;
   companyId: number;
+  code: string;
   name: string;
   type: string;
   description: string;

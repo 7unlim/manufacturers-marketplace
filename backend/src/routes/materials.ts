@@ -18,9 +18,9 @@ router.get('/', (req, res) => {
   `;
 
   if (search && typeof search === 'string' && search.trim()) {
-    query += ' AND (m.name LIKE ? OR m.description LIKE ?)';
+    query += ' AND (m.name LIKE ? OR m.description LIKE ? OR m.code LIKE ?)';
     const pattern = `%${search.trim()}%`;
-    params.push(pattern, pattern);
+    params.push(pattern, pattern, pattern);
   }
 
   if (type && typeof type === 'string' && type.trim()) {

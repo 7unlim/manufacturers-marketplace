@@ -17,12 +17,14 @@ CREATE TABLE IF NOT EXISTS companies (
   phone TEXT NOT NULL,
   email TEXT NOT NULL,
   location TEXT,
-  description TEXT
+  description TEXT,
+  certifications TEXT
 );
 
 CREATE TABLE IF NOT EXISTS materials (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   companyId INTEGER NOT NULL,
+  code TEXT,
   name TEXT NOT NULL,
   type TEXT NOT NULL,
   description TEXT,
@@ -99,6 +101,12 @@ try {
 try {
   db.exec(`ALTER TABLE bid_line_items ADD COLUMN urgency TEXT DEFAULT 'standard';`);
 } catch {}
+try {
+  db.exec(`ALTER TABLE materials ADD COLUMN code TEXT;`);
+} catch {}
+try {
+  db.exec(`ALTER TABLE companies ADD COLUMN certifications TEXT;`);
+} catch {}
 
 const companySeed = [
   {
@@ -106,27 +114,31 @@ const companySeed = [
     phone: '313-555-0100',
     email: 'sales@northforge.com',
     location: 'Detroit, MI',
-    description: 'High-strength aircraft and automotive components.'
+    description: 'High-strength aircraft and automotive components.',
+    certifications: ['ISO 9001:2015', 'AS9100D', 'NADCAP', 'ITAR Registered']
   },
   {
     name: 'Catalyst Composites',
     phone: '212-555-0180',
     email: 'contact@catalystcomposites.com',
     location: 'Newark, NJ',
-    description: 'Advanced composite panels and thermal solutions.'
+    description: 'Advanced composite panels and thermal solutions.',
+    certifications: ['ISO 9001:2015', 'ISO 14001', 'OHSAS 18001', 'UL Listed']
   },
   {
     name: 'Pacific Precision Metals',
     phone: '206-555-0255',
     email: 'orders@pacificprecision.com',
     location: 'Seattle, WA',
-    description: 'Precision machined metals specializing in marine-grade alloys.'
+    description: 'Precision machined metals specializing in marine-grade alloys.',
+    certifications: ['ISO 9001:2015', 'DNV-GL', 'ABS Certified', 'Lloyd\'s Register']
   }
 ];
 
 const materialsSeed = [
   {
     companyIndex: 0,
+    code: 'NF-AL6061-T6',
     name: 'Aerospace Grade Aluminum 6061-T6',
     type: 'Metal',
     description: 'Forged billets that meet AMS 4027 requirements.',
@@ -137,6 +149,7 @@ const materialsSeed = [
   },
   {
     companyIndex: 0,
+    code: 'NF-TI-FST-01',
     name: 'Forged Titanium Fasteners',
     type: 'Metal',
     description: 'Precision-machined, vacuum-heat-treated hardware.',
@@ -147,6 +160,7 @@ const materialsSeed = [
   },
   {
     companyIndex: 1,
+    code: 'CC-CFB-ARM-X1',
     name: 'Carbon Fiber Armor Plate',
     type: 'Composite',
     description: 'Multi-weave composite with thermal barrier finish.',
@@ -157,6 +171,7 @@ const materialsSeed = [
   },
   {
     companyIndex: 1,
+    code: 'CC-GTS-200',
     name: 'Graphene Thermal Spreaders',
     type: 'Composite',
     description: 'Ultra-thin spreaders tuned for server racks.',
@@ -167,6 +182,7 @@ const materialsSeed = [
   },
   {
     companyIndex: 2,
+    code: 'PP-SS316-BAR',
     name: 'Marine Grade Stainless Bars',
     type: 'Metal',
     description: 'S31254 polished bars for high-salt environments.',
@@ -177,6 +193,7 @@ const materialsSeed = [
   },
   {
     companyIndex: 2,
+    code: 'PP-INC-718-SH',
     name: 'Heat-Treated Inconel Sheets',
     type: 'Metal',
     description: '7000-series sheet metal certified for pressure vessels.',
@@ -194,10 +211,10 @@ const seedDatabase = () => {
   }
 
   const insertCompany = db.prepare(
-    'INSERT INTO companies (name, phone, email, location, description) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO companies (name, phone, email, location, description, certifications) VALUES (?, ?, ?, ?, ?, ?)'
   );
   const insertMaterial = db.prepare(
-    'INSERT INTO materials (companyId, name, type, description, stock, baseUnitPrice, costPerUnit, leadTimeDays) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO materials (companyId, code, name, type, description, stock, baseUnitPrice, costPerUnit, leadTimeDays) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
 
   const companyIds: number[] = [];
@@ -208,7 +225,8 @@ const seedDatabase = () => {
       company.phone,
       company.email,
       company.location,
-      company.description
+      company.description,
+      JSON.stringify(company.certifications)
     );
     companyIds.push(result.lastInsertRowid as number);
   }
@@ -217,6 +235,7 @@ const seedDatabase = () => {
     const companyId = companyIds[material.companyIndex];
     insertMaterial.run(
       companyId,
+      material.code,
       material.name,
       material.type,
       material.description,

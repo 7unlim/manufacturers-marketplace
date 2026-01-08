@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "react-router-dom";
-import { Search, Package, Users, Building2, ChevronDown, LogOut, Settings, User, Plus, Sparkles, ShoppingCart } from "lucide-react";
+import { Search, Package, Users, Building2, ChevronDown, LogOut, Settings, User, Plus, Sparkles, ShoppingCart, Shield, Award } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,7 +70,8 @@ const BuyerHome = () => {
       const matchesSearch = searchTerm === "" ||
         m.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.type.toLowerCase().includes(searchTerm.toLowerCase());
+        m.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (m.code && m.code.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesCategory = categoryFilter === "all" || m.type === categoryFilter;
       const matchesCompany = companyFilter === "all" || m.companyId === Number(companyFilter);
@@ -84,6 +85,15 @@ const BuyerHome = () => {
     activePartners: companies.length,
     totalStock: materials.reduce((sum, m) => sum + m.stock, 0)
   }), [materials, companies]);
+
+  const getCertifications = (company: Company | null): string[] => {
+    if (!company?.certifications) return [];
+    try {
+      return JSON.parse(company.certifications);
+    } catch {
+      return [];
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -215,7 +225,7 @@ const BuyerHome = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search by company, material, or type..."
+                placeholder="Search by code, material, company, or type..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 bg-card"
@@ -234,8 +244,9 @@ const BuyerHome = () => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead className="font-display font-semibold text-foreground">Company</TableHead>
+                  <TableHead className="font-display font-semibold text-foreground">Code</TableHead>
                   <TableHead className="font-display font-semibold text-foreground">Material</TableHead>
+                  <TableHead className="font-display font-semibold text-foreground">Company</TableHead>
                   <TableHead className="font-display font-semibold text-foreground">Type</TableHead>
                   <TableHead className="font-display font-semibold text-foreground">Stock</TableHead>
                   <TableHead className="font-display font-semibold text-foreground">Per Unit</TableHead>
@@ -254,13 +265,18 @@ const BuyerHome = () => {
                         if (company) setSelectedCompany(company);
                       }}
                     >
-                      <TableCell className="font-medium text-foreground">{material.companyName}</TableCell>
+                      <TableCell>
+                        <code className="px-2 py-1 rounded bg-muted text-xs font-mono text-foreground">
+                          {material.code || '—'}
+                        </code>
+                      </TableCell>
                       <TableCell>
                         <div>
                           <span className="font-medium text-foreground">{material.name}</span>
                           <p className="text-xs text-muted-foreground truncate max-w-[200px]">{material.description}</p>
                         </div>
                       </TableCell>
+                      <TableCell className="font-medium text-foreground">{material.companyName}</TableCell>
                       <TableCell>
                         <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
                           {material.type}
@@ -281,7 +297,7 @@ const BuyerHome = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                       No materials found matching your search.
                     </TableCell>
                   </TableRow>
@@ -320,6 +336,28 @@ const BuyerHome = () => {
                   <p className="font-medium">{selectedCompany.email}</p>
                 </div>
               </div>
+
+              {/* Certifications */}
+              {getCertifications(selectedCompany).length > 0 && (
+                <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
+                    <Shield className="w-4 h-4" />
+                    Certifications
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {getCertifications(selectedCompany).map((cert, idx) => (
+                      <span 
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-500/10 text-green-700 text-xs font-medium"
+                      >
+                        <Award className="w-3 h-3" />
+                        {cert}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="pt-4 border-t">
                 <p className="text-sm text-muted-foreground mb-2">Materials from this company</p>
                 <p className="text-2xl font-display font-bold text-primary">

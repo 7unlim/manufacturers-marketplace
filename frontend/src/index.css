@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+:root {
     --background: 210 20% 98%;
     --foreground: 222 47% 11%;
 
@@ -94,9 +94,9 @@
 @layer base {
   * {
     @apply border-border;
-  }
+}
 
-  body {
+body {
     @apply bg-background text-foreground font-sans antialiased;
   }
 
@@ -108,11 +108,11 @@
 @layer utilities {
   .gradient-hero {
     background: var(--gradient-hero);
-  }
+}
 
   .gradient-card {
     background: var(--gradient-card);
-  }
+}
 
   .gradient-surface {
     background: var(--gradient-surface);
@@ -144,12 +144,12 @@
 
   .hover-lift {
     @apply transition-all duration-150;
-  }
+}
 
   .hover-lift:hover {
     @apply -translate-y-0.5;
     box-shadow: var(--shadow-md);
-  }
+}
 }
 
 /* Subtle animations with minimal movement */

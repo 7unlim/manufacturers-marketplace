@@ -209,3 +209,20 @@ export const submitBid = (id: number): Promise<{ bidId: number; status: string }
   }).then(handleResponse);
 };
 
+export const cancelBid = (id: number): Promise<{ bidId: number; status: string }> => {
+  return fetch(`${baseUrl}/api/bids/${id}/cancel`, {
+    method: 'POST'
+  }).then(handleResponse);
+};
+
+export const updateBidDetails = (
+  id: number,
+  details: BidTerms & { buyerName?: string }
+): Promise<{ bidId: number; message: string }> => {
+  return fetch(`${baseUrl}/api/bids/${id}/details`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(details)
+  }).then(handleResponse);
+};
+

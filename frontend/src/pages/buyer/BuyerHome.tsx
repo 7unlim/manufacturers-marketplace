@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "react-router-dom";
-import { Search, Package, Users, Building2, ChevronDown, LogOut, Settings, User, Plus, Sparkles, ShoppingCart, Shield, Award } from "lucide-react";
+import { Search, Package, Users, Building2, ChevronDown, LogOut, Settings, User, Plus, Sparkles, ShoppingCart, Shield, Award, FileText } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -126,6 +126,13 @@ const BuyerHome = () => {
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <Sparkles className="w-4 h-4 mr-2" />
                   Bid Builder
+                </Button>
+              </Link>
+              <span className="text-border">|</span>
+              <Link to="/buyer/bids/history">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <FileText className="w-4 h-4 mr-2" />
+                  My Bids
                 </Button>
               </Link>
             </div>

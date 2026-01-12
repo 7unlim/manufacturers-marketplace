@@ -13,6 +13,7 @@ import NotFound from "./pages/NotFound";
 import BuyerHome from "./pages/buyer/BuyerHome";
 import BuyerCompanies from "./pages/buyer/BuyerCompanies";
 import BuyerBids from "./pages/buyer/BuyerBids";
+import BuyerBidsHistory from "./pages/buyer/BuyerBidsHistory";
 
 // Seller Pages
 import SellerDashboard from "./pages/seller/SellerDashboard";
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/buyer/home" element={<BuyerHome />} />
           <Route path="/buyer/companies" element={<BuyerCompanies />} />
           <Route path="/buyer/bids" element={<BuyerBids />} />
+          <Route path="/buyer/bids/history" element={<BuyerBidsHistory />} />
           
           {/* Seller Routes */}
           <Route path="/seller/dashboard" element={<SellerDashboard />} />

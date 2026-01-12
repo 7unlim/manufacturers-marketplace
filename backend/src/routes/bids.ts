@@ -222,5 +222,64 @@ router.put('/:id/seller-notes', (req, res) => {
   res.json({ bidId, sellerResponse });
 });
 
+// Cancel bid (buyer can cancel if not yet accepted/rejected)
+router.post('/:id/cancel', (req, res) => {
+  const bidId = Number(req.params.id);
+
+  const existing = getBidStatus(bidId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Bid not found' });
+  }
+
+  if (existing.status === 'accepted' || existing.status === 'rejected') {
+    return res.status(400).json({ error: 'Cannot cancel a bid that has been accepted or rejected' });
+  }
+
+  db.prepare('UPDATE bids SET status = ? WHERE id = ?').run('cancelled', bidId);
+  res.json({ bidId, status: 'cancelled' });
+});
+
+// Update bid details (for editing submitted bids)
+router.put('/:id/details', (req, res) => {
+  const bidId = Number(req.params.id);
+  const { buyerName, buyerEmail, buyerPhone, deliveryPreference, deliveryDate, paymentTerms, shippingAddress, bidJustification, specialRequirements } = req.body as BidTerms & { buyerName?: string };
+
+  const existing = getBidStatus(bidId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Bid not found' });
+  }
+
+  if (existing.status === 'accepted' || existing.status === 'rejected') {
+    return res.status(400).json({ error: 'Cannot edit a bid that has been accepted or rejected' });
+  }
+
+  db.prepare(`
+    UPDATE bids SET 
+      buyerName = COALESCE(?, buyerName),
+      buyerEmail = COALESCE(?, buyerEmail),
+      buyerPhone = COALESCE(?, buyerPhone),
+      deliveryPreference = COALESCE(?, deliveryPreference),
+      deliveryDate = COALESCE(?, deliveryDate),
+      paymentTerms = COALESCE(?, paymentTerms),
+      shippingAddress = COALESCE(?, shippingAddress),
+      bidJustification = COALESCE(?, bidJustification),
+      specialRequirements = COALESCE(?, specialRequirements)
+    WHERE id = ?
+  `).run(
+    buyerName || null,
+    buyerEmail || null,
+    buyerPhone || null,
+    deliveryPreference || null,
+    deliveryDate || null,
+    paymentTerms || null,
+    shippingAddress || null,
+    bidJustification || null,
+    specialRequirements || null,
+    bidId
+  );
+  
+  res.json({ bidId, message: 'Bid updated successfully' });
+});
+
 export default router;
 

@@ -106,6 +106,17 @@ const SellerBids = () => {
     return styles[status] || styles.draft;
   };
 
+  const getStatusLabel = (status: Bid["status"]) => {
+    const labels: Record<Bid["status"], string> = {
+      draft: "Draft",
+      submitted: "Response Needed",
+      accepted: "Accepted",
+      rejected: "Rejected",
+      countered: "Countered",
+    };
+    return labels[status] ?? status;
+  };
+
   const handleRespond = async (action: 'accept' | 'reject' | 'counter') => {
     if (!selectedBid) return;
     
@@ -237,7 +248,7 @@ const SellerBids = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Bids</SelectItem>
-              <SelectItem value="submitted">Submitted</SelectItem>
+              <SelectItem value="submitted">Response Needed</SelectItem>
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="accepted">Accepted</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
@@ -285,7 +296,7 @@ const SellerBids = () => {
                     </TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(bid.status)}`}>
-                        {bid.status}
+                        {getStatusLabel(bid.status)}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -334,7 +345,7 @@ const SellerBids = () => {
               <span>Bid #{selectedBid?.id}</span>
               {selectedBid && (
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(selectedBid.status)}`}>
-                  {selectedBid.status}
+                  {getStatusLabel(selectedBid.status)}
                 </span>
               )}
             </DialogTitle>
@@ -563,7 +574,7 @@ const SellerBids = () => {
                         {selectedBid.status === 'accepted' && <Check className="w-4 h-4" />}
                         {selectedBid.status === 'rejected' && <X className="w-4 h-4" />}
                         {selectedBid.status === 'countered' && <MessageSquare className="w-4 h-4" />}
-                        Bid {selectedBid.status}
+                        Bid {getStatusLabel(selectedBid.status)}
                       </div>
                       
                       {selectedBid.sellerResponse && (

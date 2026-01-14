@@ -404,8 +404,8 @@ const Landing = () => {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Email</p>
-                      <a href="mailto:hello@blueview.io" className="font-medium text-foreground hover:text-primary transition-colors">
-                        hello@blueview.io
+                      <a href="mailto:hello@waypoint.io" className="font-medium text-foreground hover:text-primary transition-colors">
+                        hello@waypoint.io
                       </a>
                     </div>
                   </div>

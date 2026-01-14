@@ -54,7 +54,7 @@ const Landing = () => {
             <div className="w-8 h-8 gradient-hero rounded-lg flex items-center justify-center">
               <Package className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-xl text-foreground">BlueView</span>
+            <span className="font-display font-bold text-xl text-foreground">Waypoint</span>
           </div>
           
           <div className="hidden md:flex items-center gap-8">
@@ -83,7 +83,7 @@ const Landing = () => {
             </h1>
             
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              BlueView helps manufacturing companies track materials, connect with partners, 
+              Waypoint helps manufacturing companies track materials, connect with partners, 
               and optimize their supply chain — all in one powerful platform.
             </p>
 
@@ -319,7 +319,7 @@ const Landing = () => {
                 Empowering Manufacturers to Build the Future
               </h2>
               <p className="text-muted-foreground text-lg leading-relaxed">
-                Founded in 2024, BlueView was born from a simple observation: manufacturing supply chains 
+                Founded in 2024, Waypoint was born from a simple observation: manufacturing supply chains 
                 are too complex, too slow, and too expensive. We're changing that by connecting buyers 
                 and suppliers on a single, intelligent platform.
               </p>
@@ -522,7 +522,7 @@ const Landing = () => {
                 Ready to Transform Your Operations?
               </h2>
               <p className="text-primary-foreground/80 max-w-xl mx-auto">
-                Join hundreds of manufacturing companies already using BlueView to streamline their operations.
+                Join hundreds of manufacturing companies already using Waypoint to streamline their operations.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link to="/auth">
@@ -551,7 +551,7 @@ const Landing = () => {
                 <div className="w-8 h-8 gradient-hero rounded-lg flex items-center justify-center">
                   <Package className="w-5 h-5 text-primary-foreground" />
                 </div>
-                <span className="font-display font-bold text-lg text-foreground">BlueView</span>
+                <span className="font-display font-bold text-lg text-foreground">Waypoint</span>
               </div>
               <p className="text-sm text-muted-foreground">
                 The modern platform for manufacturing materials management and procurement.
@@ -594,7 +594,7 @@ const Landing = () => {
 
           <div className="pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2026 BlueView. All rights reserved.
+              © 2026 Waypoint. All rights reserved.
             </p>
             <div className="flex items-center gap-6">
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">

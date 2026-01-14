@@ -12,7 +12,7 @@ const Auth = () => {
             <div className="w-8 h-8 gradient-hero rounded-lg flex items-center justify-center">
               <Package className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-xl text-foreground">BlueView</span>
+            <span className="font-display font-bold text-xl text-foreground">Waypoint</span>
           </Link>
         </div>
       </nav>
@@ -22,7 +22,7 @@ const Auth = () => {
         <div className="w-full max-w-4xl">
           <div className="text-center mb-12">
             <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Welcome to BlueView
+              Welcome to Waypoint
             </h1>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
               Choose how you'd like to use the platform. Are you looking to source materials or sell them?

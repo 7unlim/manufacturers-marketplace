@@ -94,7 +94,7 @@ const SellerDashboard = () => {
               <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
                 <Factory className="w-5 h-5 text-accent-foreground" />
               </div>
-              <span className="font-display font-bold text-xl text-foreground">BlueView</span>
+              <span className="font-display font-bold text-xl text-foreground">Waypoint</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">Seller</span>
             </Link>
 

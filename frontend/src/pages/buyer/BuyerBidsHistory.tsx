@@ -186,7 +186,7 @@ const BuyerBidsHistory = () => {
               <div className="w-8 h-8 gradient-hero rounded-lg flex items-center justify-center">
                 <ShoppingCart className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="font-display font-bold text-xl text-foreground">BlueView</span>
+              <span className="font-display font-bold text-xl text-foreground">Waypoint</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Buyer</span>
             </Link>
 

@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
 import { 
   Package, Building2, ChevronDown, LogOut, Settings, User, 
@@ -12,8 +15,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { fetchCompanies, fetchMaterials, fetchBids, type Company, type Material, type Bid } from "@/lib/api";
+import { fetchCompanies, fetchMaterials, fetchBids, updateCompany, type Company, type Material, type Bid } from "@/lib/api";
 
 const SELLER_COMPANY_ID = 1;
 
@@ -35,6 +45,9 @@ const SellerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [revenueData] = useState(generateRevenueData);
   const [chartPeriod, setChartPeriod] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>('1Y');
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<Partial<Company>>({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -73,6 +86,30 @@ const SellerDashboard = () => {
   }, [materials, bids]);
 
   const recentBids = bids.slice(0, 5);
+
+  const getStatusBadge = (status: Bid["status"]) => {
+    const styles: Record<Bid["status"], string> = {
+      draft: "bg-muted text-muted-foreground",
+      submitted: "bg-primary/10 text-primary",
+      accepted: "bg-green-500/10 text-green-600",
+      rejected: "bg-destructive/10 text-destructive",
+      countered: "bg-purple-500/10 text-purple-600",
+      cancelled: "bg-muted text-muted-foreground",
+    };
+    return styles[status] || styles.draft;
+  };
+
+  const getStatusLabel = (status: Bid["status"]) => {
+    const labels: Record<Bid["status"], string> = {
+      draft: "Draft",
+      submitted: "Response Needed",
+      accepted: "Accepted",
+      rejected: "Rejected",
+      countered: "Countered",
+      cancelled: "Cancelled",
+    };
+    return labels[status] ?? status;
+  };
   
   const currentRevenue = revenueData[revenueData.length - 1]?.revenue || 0;
   const previousRevenue = revenueData[revenueData.length - 2]?.revenue || 0;
@@ -83,6 +120,36 @@ const SellerDashboard = () => {
     const sliceMap = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12, 'ALL': 12 };
     return revenueData.slice(-sliceMap[chartPeriod]);
   }, [revenueData, chartPeriod]);
+
+  const handleEditProfile = () => {
+    if (company) {
+      setEditingCompany({
+        name: company.name,
+        phone: company.phone,
+        email: company.email,
+        location: company.location,
+        description: company.description,
+        certifications: company.certifications
+      });
+      setEditDialogOpen(true);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!company) return;
+    
+    setSaving(true);
+    try {
+      const updated = await updateCompany(company.id, editingCompany);
+      setCompany(updated);
+      setEditDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to update company:", error);
+      alert("Failed to update profile. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -321,13 +388,10 @@ const SellerDashboard = () => {
                           </div>
                           <div className="text-right">
                             <p className="font-semibold text-foreground">${bid.totalAmount.toFixed(2)}</p>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              bid.status === 'submitted' ? 'bg-primary/10 text-primary' :
-                              bid.status === 'accepted' ? 'bg-green-500/10 text-green-600' :
-                              bid.status === 'rejected' ? 'bg-destructive/10 text-destructive' :
-                              'bg-muted text-muted-foreground'
-                            }`}>
-                              {bid.status}
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadge(bid.status)}`}
+                            >
+                              {getStatusLabel(bid.status)}
                             </span>
                           </div>
                         </div>
@@ -366,7 +430,7 @@ const SellerDashboard = () => {
                       <p className="text-sm text-muted-foreground">Email</p>
                       <p className="font-medium">{company.email}</p>
                     </div>
-                    <Button variant="outline" className="w-full mt-4">
+                    <Button variant="outline" className="w-full mt-4" onClick={handleEditProfile}>
                       <Settings className="w-4 h-4 mr-2" />
                       Edit Profile
                     </Button>
@@ -377,6 +441,89 @@ const SellerDashboard = () => {
           </>
         )}
       </main>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Company Profile</DialogTitle>
+            <DialogDescription>
+              Update your company information. Changes will be visible to buyers.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Company Name</Label>
+              <Input
+                id="name"
+                value={editingCompany.name || ''}
+                onChange={(e) => setEditingCompany({ ...editingCompany, name: e.target.value })}
+                placeholder="Enter company name"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  value={editingCompany.phone || ''}
+                  onChange={(e) => setEditingCompany({ ...editingCompany, phone: e.target.value })}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={editingCompany.email || ''}
+                  onChange={(e) => setEditingCompany({ ...editingCompany, email: e.target.value })}
+                  placeholder="Enter email address"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                value={editingCompany.location || ''}
+                onChange={(e) => setEditingCompany({ ...editingCompany, location: e.target.value })}
+                placeholder="Enter location (e.g., City, State)"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={editingCompany.description || ''}
+                onChange={(e) => setEditingCompany({ ...editingCompany, description: e.target.value })}
+                placeholder="Enter company description"
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

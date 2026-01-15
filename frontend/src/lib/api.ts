@@ -118,6 +118,17 @@ export const fetchCompany = (id: number): Promise<Company> => {
   return fetch(`${baseUrl}/api/companies/${id}`).then(handleResponse);
 };
 
+export const updateCompany = (
+  id: number,
+  data: Partial<Company>
+): Promise<Company> => {
+  return fetch(`${baseUrl}/api/companies/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(handleResponse);
+};
+
 export const fetchMaterials = (filters: MaterialFilterOptions = {}): Promise<Material[]> => {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {

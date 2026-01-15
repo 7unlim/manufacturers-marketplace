@@ -22,7 +22,7 @@ import {
   Package, Building2, ChevronDown, LogOut, Settings, User, 
   Sparkles, ShoppingCart, FileText, Eye, Edit2, X, Clock,
   CheckCircle2, XCircle, MessageSquare, AlertCircle, Truck,
-  CreditCard, MapPin, RefreshCw
+  CreditCard, MapPin, RefreshCw, Send
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -46,8 +46,8 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { 
-  fetchBids, fetchBid, cancelBid, updateBidDetails,
-  type Bid, type BidWithLineItems 
+  fetchBids, fetchBid, cancelBid, updateBidDetails, updateBid, submitBid,
+  type Bid, type BidWithLineItems, type BidItemPayload
 } from "@/lib/api";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
@@ -55,7 +55,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   submitted: { label: 'Submitted', color: 'bg-blue-500/10 text-blue-600', icon: Clock },
   accepted: { label: 'Accepted', color: 'bg-green-500/10 text-green-600', icon: CheckCircle2 },
   rejected: { label: 'Rejected', color: 'bg-destructive/10 text-destructive', icon: XCircle },
-  countered: { label: 'Countered', color: 'bg-amber-500/10 text-amber-600', icon: MessageSquare },
+  countered: { label: 'Countered', color: 'bg-purple-500/10 text-purple-600', icon: MessageSquare },
   cancelled: { label: 'Cancelled', color: 'bg-muted text-muted-foreground', icon: X },
 };
 
@@ -82,6 +82,17 @@ const BuyerBidsHistory = () => {
     bidJustification: '',
     specialRequirements: '',
   });
+  
+  // Line items editing state (for countered bids)
+  const [editLineItems, setEditLineItems] = useState<Array<{
+    id: number;
+    materialId: number;
+    materialName: string;
+    quantity: number;
+    proposedUnitPrice: number;
+    itemNote: string;
+    urgency: 'standard' | 'expedited' | 'rush';
+  }>>([]);
 
   useEffect(() => {
     loadBids();
@@ -123,6 +134,18 @@ const BuyerBidsHistory = () => {
         bidJustification: fullBid.bidJustification || '',
         specialRequirements: fullBid.specialRequirements || '',
       });
+      // Initialize line items for editing (if countered, allow editing line items)
+      if (fullBid.status === 'countered' && fullBid.lineItems) {
+        setEditLineItems(fullBid.lineItems.map(item => ({
+          id: item.id,
+          materialId: item.materialId,
+          materialName: item.materialName || `Material #${item.materialId}`,
+          quantity: item.quantity,
+          proposedUnitPrice: item.proposedUnitPrice,
+          itemNote: item.itemNote || '',
+          urgency: item.urgency || 'standard',
+        })));
+      }
       setEditDialogOpen(true);
     } catch (error) {
       console.error("Failed to load bid for editing:", error);
@@ -134,12 +157,61 @@ const BuyerBidsHistory = () => {
     
     setActionLoading(true);
     try {
+      // If countered and line items were edited, update line items first
+      if (selectedBid.status === 'countered' && editLineItems.length > 0) {
+        const lineItemsPayload: BidItemPayload[] = editLineItems.map(item => ({
+          materialId: item.materialId,
+          quantity: item.quantity,
+          proposedUnitPrice: item.proposedUnitPrice,
+          itemNote: item.itemNote,
+          urgency: item.urgency,
+        }));
+        await updateBid(selectedBid.id, lineItemsPayload);
+      }
+      
+      // Update bid details
       await updateBidDetails(selectedBid.id, editForm);
       await loadBids();
       setEditDialogOpen(false);
       setSelectedBid(null);
+      setEditLineItems([]);
     } catch (error) {
       console.error("Failed to update bid:", error);
+      alert("Failed to update bid. Please try again.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  const handleResubmitBid = async () => {
+    if (!selectedBid) return;
+    
+    setActionLoading(true);
+    try {
+      // Update line items if edited
+      if (editLineItems.length > 0) {
+        const lineItemsPayload: BidItemPayload[] = editLineItems.map(item => ({
+          materialId: item.materialId,
+          quantity: item.quantity,
+          proposedUnitPrice: item.proposedUnitPrice,
+          itemNote: item.itemNote,
+          urgency: item.urgency,
+        }));
+        await updateBid(selectedBid.id, lineItemsPayload);
+      }
+      
+      // Update details
+      await updateBidDetails(selectedBid.id, editForm);
+      
+      // Resubmit
+      await submitBid(selectedBid.id);
+      await loadBids();
+      setEditDialogOpen(false);
+      setSelectedBid(null);
+      setEditLineItems([]);
+    } catch (error) {
+      console.error("Failed to resubmit bid:", error);
+      alert("Failed to resubmit bid. Please try again.");
     } finally {
       setActionLoading(false);
     }
@@ -268,7 +340,7 @@ const BuyerBidsHistory = () => {
             { label: 'Total Bids', value: bids.length, color: 'text-foreground' },
             { label: 'Submitted', value: bids.filter(b => b.status === 'submitted').length, color: 'text-blue-600' },
             { label: 'Accepted', value: bids.filter(b => b.status === 'accepted').length, color: 'text-green-600' },
-            { label: 'Countered', value: bids.filter(b => b.status === 'countered').length, color: 'text-amber-600' },
+            { label: 'Countered', value: bids.filter(b => b.status === 'countered').length, color: 'text-purple-600' },
             { label: 'Rejected', value: bids.filter(b => b.status === 'rejected').length, color: 'text-destructive' },
           ].map((stat, i) => (
             <div key={i} className="p-4 rounded-xl bg-card border border-border">
@@ -431,8 +503,25 @@ const BuyerBidsHistory = () => {
                 </span>
               </div>
 
-              {/* Seller Response */}
-              {selectedBid.sellerResponse && (
+              {/* Seller Counter Response - Prominently displayed */}
+              {selectedBid.status === 'countered' && selectedBid.sellerResponse && (
+                <div className="p-5 rounded-lg bg-purple-500/10 border-2 border-purple-500/30 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5 text-purple-600" />
+                    <p className="text-base font-semibold text-foreground">Seller Counter Offer</p>
+                  </div>
+                  <div className="bg-background p-4 rounded-md border border-purple-500/20">
+                    <p className="text-sm whitespace-pre-wrap">{selectedBid.sellerResponse}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    You can edit your proposal and resubmit to respond to this counter.
+                  </p>
+                </div>
+              )}
+              
+              {/* Seller Response (for other statuses) */}
+              {selectedBid.status !== 'countered' && selectedBid.sellerResponse && (
                 <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                   <p className="text-sm font-medium mb-2 flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-primary" />
@@ -509,12 +598,37 @@ const BuyerBidsHistory = () => {
               Edit Bid #{selectedBid?.id}
             </DialogTitle>
             <DialogDescription>
-              Update your bid details. Note: You cannot edit line items after submission.
+              {selectedBid?.status === 'countered' 
+                ? "Update your proposal based on the seller's counter offer. You can modify line items, pricing, and other details."
+                : "Update your bid details. Note: You cannot edit line items after submission."}
             </DialogDescription>
           </DialogHeader>
           
-          <Tabs defaultValue="info" className="mt-4">
+          {/* Show seller counter prominently if countered - Always visible */}
+          {selectedBid?.status === 'countered' && selectedBid.sellerResponse && (
+            <div className="p-5 rounded-lg bg-purple-500/10 border-2 border-purple-500/30 mt-4 mb-4 sticky top-0 z-10">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageSquare className="w-5 h-5 text-purple-600" />
+                <p className="text-base font-semibold text-foreground">Seller Counter Offer</p>
+              </div>
+              <div className="bg-background p-4 rounded-md border border-purple-500/20 max-h-48 overflow-y-auto">
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{selectedBid.sellerResponse}</p>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                Review their feedback below and adjust your proposal accordingly.
+              </p>
+            </div>
+          )}
+          
+          <Tabs defaultValue={selectedBid?.status === 'countered' ? "items" : "info"} className="mt-4">
             <TabsList className="w-full">
+              {selectedBid?.status === 'countered' && (
+                <TabsTrigger value="items" className="flex-1">
+                  <Package className="w-4 h-4 mr-2" />
+                  Line Items
+                </TabsTrigger>
+              )}
               <TabsTrigger value="info" className="flex-1">
                 <User className="w-4 h-4 mr-2" />
                 Your Info
@@ -529,6 +643,85 @@ const BuyerBidsHistory = () => {
               </TabsTrigger>
             </TabsList>
 
+            {selectedBid?.status === 'countered' && (
+              <TabsContent value="items" className="space-y-4 mt-4">
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Adjust quantities, prices, or notes for each line item based on the seller's counter offer.
+                  </p>
+                  {editLineItems.map((item, index) => (
+                    <div key={item.id} className="p-4 rounded-lg border border-border bg-muted/30 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium">{item.materialName}</p>
+                          {item.itemNote && (
+                            <p className="text-xs text-muted-foreground mt-1">Note: {item.itemNote}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">Quantity</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const newItems = [...editLineItems];
+                              newItems[index].quantity = parseInt(e.target.value) || 1;
+                              setEditLineItems(newItems);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">Unit Price</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.proposedUnitPrice}
+                            onChange={(e) => {
+                              const newItems = [...editLineItems];
+                              newItems[index].proposedUnitPrice = parseFloat(e.target.value) || 0;
+                              setEditLineItems(newItems);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">Total</label>
+                          <div className="h-10 flex items-center px-3 rounded-md border border-border bg-background">
+                            <span className="font-semibold text-primary">
+                              ${(item.quantity * item.proposedUnitPrice).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Item Note</label>
+                        <Textarea
+                          value={item.itemNote}
+                          onChange={(e) => {
+                            const newItems = [...editLineItems];
+                            newItems[index].itemNote = e.target.value;
+                            setEditLineItems(newItems);
+                          }}
+                          placeholder="Add a note about this line item..."
+                          rows={2}
+                          className="text-xs"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between pt-3 border-t border-border">
+                    <span className="font-semibold">Total Amount</span>
+                    <span className="text-xl font-display font-bold text-primary">
+                      ${editLineItems.reduce((sum, item) => sum + (item.quantity * item.proposedUnitPrice), 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </TabsContent>
+            )}
+            
             <TabsContent value="info" className="space-y-4 mt-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Company / Buyer Name</label>
@@ -650,17 +843,41 @@ const BuyerBidsHistory = () => {
           </Tabs>
 
           <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setEditDialogOpen(false);
+              setEditLineItems([]);
+            }}>
               Cancel
             </Button>
-            <Button onClick={handleSaveEdit} disabled={actionLoading}>
-              {actionLoading ? (
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-              )}
-              Save Changes
-            </Button>
+            {selectedBid?.status === 'countered' ? (
+              <>
+                <Button variant="outline" onClick={handleSaveEdit} disabled={actionLoading}>
+                  {actionLoading ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                  )}
+                  Save Draft
+                </Button>
+                <Button onClick={handleResubmitBid} disabled={actionLoading}>
+                  {actionLoading ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  Resubmit Bid
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleSaveEdit} disabled={actionLoading}>
+                {actionLoading ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                )}
+                Save Changes
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -46,6 +46,7 @@ import {
   fetchCompanies, fetchBids, fetchBid, respondToBid,
   type Company, type Bid, type BidWithLineItems 
 } from "@/lib/api";
+import confetti from "canvas-confetti";
 
 const SELLER_COMPANY_ID = 1;
 
@@ -58,6 +59,10 @@ const SellerBids = () => {
   const [loadingBid, setLoadingBid] = useState(false);
   const [responseNote, setResponseNote] = useState("");
   const [responding, setResponding] = useState(false);
+  const [counterNotes, setCounterNotes] = useState<Record<number, string>>({});
+  const [counterSummary, setCounterSummary] = useState("");
+  const [justCountered, setJustCountered] = useState(false);
+  const [activeTab, setActiveTab] = useState<"items" | "details" | "respond" | "counter">("items");
 
   useEffect(() => {
     const loadData = async () => {
@@ -101,7 +106,7 @@ const SellerBids = () => {
       submitted: "bg-primary/10 text-primary",
       accepted: "bg-green-500/10 text-green-600",
       rejected: "bg-destructive/10 text-destructive",
-      countered: "bg-amber-500/10 text-amber-600",
+      countered: "bg-purple-500/10 text-purple-600",
     };
     return styles[status] || styles.draft;
   };
@@ -117,12 +122,13 @@ const SellerBids = () => {
     return labels[status] ?? status;
   };
 
-  const handleRespond = async (action: 'accept' | 'reject' | 'counter') => {
+  const handleRespond = async (action: 'accept' | 'reject' | 'counter', overrideNote?: string) => {
     if (!selectedBid) return;
     
     setResponding(true);
     try {
-      const result = await respondToBid(selectedBid.id, action, responseNote);
+      const noteToSend = overrideNote ?? responseNote;
+      const result = await respondToBid(selectedBid.id, action, noteToSend);
       
       // Update local state
       setBids(prev => prev.map(b => 
@@ -132,6 +138,26 @@ const SellerBids = () => {
       ));
       setSelectedBid(prev => prev ? { ...prev, status: result.status as Bid['status'], sellerResponse: result.sellerResponse } : null);
       setResponseNote("");
+      setCounterNotes({});
+      setCounterSummary("");
+
+      // If we just countered, show a success state and confetti
+      if (action === "counter" && result.status === "countered") {
+        setJustCountered(true);
+        setActiveTab("counter");
+        try {
+          confetti({
+            particleCount: 90,
+            spread: 70,
+            origin: { y: 0.3 },
+            scalar: 0.8,
+          });
+        } catch {
+          // ignore confetti errors in non-browser environments
+        }
+      } else {
+        setJustCountered(false);
+      }
     } catch (error) {
       console.error("Failed to respond to bid:", error);
     } finally {
@@ -300,29 +326,14 @@ const SellerBids = () => {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button 
-                          size="sm" 
-                          variant="ghost"
-                          onClick={() => viewBidDetails(bid.id)}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
-                        </Button>
-                        {bid.status === 'submitted' && (
-                          <>
-                            <Button size="sm" variant="ghost" className="text-green-600 hover:text-green-700">
-                              <Check className="w-4 h-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive">
-                              <X className="w-4 h-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" className="text-primary hover:text-primary">
-                              <MessageSquare className="w-4 h-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={() => viewBidDetails(bid.id)}
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -338,7 +349,19 @@ const SellerBids = () => {
       </main>
 
       {/* Bid Details Dialog */}
-      <Dialog open={!!selectedBid} onOpenChange={(open) => { if (!open) { setSelectedBid(null); setResponseNote(""); } }}>
+      <Dialog
+        open={!!selectedBid}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedBid(null);
+            setResponseNote("");
+            setCounterNotes({});
+            setCounterSummary("");
+            setJustCountered(false);
+            setActiveTab("items");
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
@@ -358,8 +381,17 @@ const SellerBids = () => {
             <div className="py-8 text-center text-muted-foreground">Loading bid details...</div>
           ) : selectedBid && (
             <div className="overflow-y-auto flex-1 -mx-6 px-6">
-              <Tabs defaultValue="items" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+              <Tabs
+                value={activeTab}
+                onValueChange={(val) => {
+                  setActiveTab(val as typeof activeTab);
+                  if (val !== "counter") {
+                    setJustCountered(false);
+                  }
+                }}
+                className="w-full"
+              >
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="items">
                     <Package className="w-4 h-4 mr-2" />
                     Items
@@ -368,9 +400,19 @@ const SellerBids = () => {
                     <FileText className="w-4 h-4 mr-2" />
                     Details
                   </TabsTrigger>
-                  <TabsTrigger value="respond">
+                  <TabsTrigger value="respond" className="relative">
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Respond
+                    {selectedBid.status === 'submitted' && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-pulse" />
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="counter" className="relative">
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Counter
+                    {selectedBid.status === 'submitted' && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                    )}
                   </TabsTrigger>
                 </TabsList>
 
@@ -520,71 +562,221 @@ const SellerBids = () => {
                 </TabsContent>
 
                 <TabsContent value="respond" className="space-y-4 mt-4">
-                  {selectedBid.status === 'submitted' ? (
-                    <>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Your Response (optional)</label>
-                        <Textarea
-                          value={responseNote}
-                          onChange={(e) => setResponseNote(e.target.value)}
-                          placeholder="Add notes to accompany your response, such as counter-offer details, questions, or terms..."
-                          rows={4}
-                        />
-                      </div>
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-5 space-y-5">
+                    {selectedBid.status === 'submitted' ? (
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4 text-primary" />
+                            Your Response (optional)
+                          </label>
+                          <Textarea
+                            value={responseNote}
+                            onChange={(e) => setResponseNote(e.target.value)}
+                            placeholder="Add notes to accompany your response, such as clarifications, questions, or key terms..."
+                            rows={4}
+                            className="bg-background border-primary/20 focus:border-primary/40"
+                          />
+                        </div>
 
-                      <div className="grid grid-cols-3 gap-3">
-                        <Button 
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => handleRespond('accept')}
-                          disabled={responding}
-                        >
-                          <Check className="w-4 h-4 mr-2" />
-                          Accept
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          className="border-amber-500 text-amber-600 hover:bg-amber-500/10"
-                          onClick={() => handleRespond('counter')}
-                          disabled={responding}
-                        >
-                          <MessageSquare className="w-4 h-4 mr-2" />
-                          Counter
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          className="text-destructive hover:text-destructive border-destructive/50"
-                          onClick={() => handleRespond('reject')}
-                          disabled={responding}
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Decline
-                        </Button>
-                      </div>
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                          <Button 
+                            className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all"
+                            onClick={() => handleRespond('accept')}
+                            disabled={responding}
+                            size="lg"
+                          >
+                            <Check className="w-4 h-4 mr-2" />
+                            Accept Bid
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            className="text-destructive hover:text-destructive border-destructive/50 hover:bg-destructive/10 shadow-sm hover:shadow-md transition-all"
+                            onClick={() => handleRespond('reject')}
+                            disabled={responding}
+                            size="lg"
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Decline Bid
+                          </Button>
+                        </div>
 
-                      <div className="p-3 rounded-lg bg-muted/50 flex items-start gap-2 text-sm text-muted-foreground">
-                        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <p>
-                          <strong>Counter:</strong> Use this to negotiate terms. Add your counter-proposal in the notes above.
+                        <div className="p-3 rounded-lg bg-background/80 border border-primary/10 flex items-start gap-2 text-sm text-muted-foreground">
+                          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
+                          <p>
+                            Use <strong className="text-foreground">Counter</strong> for detailed line-by-line negotiation on this proposal.
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${getStatusBadge(selectedBid.status)}`}>
+                          {selectedBid.status === 'accepted' && <Check className="w-4 h-4" />}
+                          {selectedBid.status === 'rejected' && <X className="w-4 h-4" />}
+                          {selectedBid.status === 'countered' && <MessageSquare className="w-4 h-4" />}
+                          Bid {getStatusLabel(selectedBid.status)}
+                        </div>
+                        
+                        {selectedBid.sellerResponse && (
+                          <div className="mt-4 p-4 rounded-lg bg-background/80 border border-primary/10 text-left">
+                            <p className="text-sm text-muted-foreground mb-1 font-medium">Your response:</p>
+                            <p className="text-sm text-foreground">{selectedBid.sellerResponse}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="counter" className="space-y-4 mt-4">
+                  <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-5 space-y-5">
+                    {selectedBid.status === 'submitted' || justCountered ? (
+                      <>
+                        {justCountered ? (
+                          <div className="text-center py-6">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 text-purple-700 border border-purple-500/30 text-sm font-medium">
+                              <Check className="w-4 h-4" />
+                              Bid successfully countered
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="pb-2 border-b border-purple-500/10">
+                              <p className="text-sm text-foreground flex items-start gap-2">
+                                <MessageSquare className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                                <span>
+                                  Review the full proposal and add <span className="font-semibold text-purple-600">marks and comments</span> to specific line items. 
+                              These notes will be sent back to the buyer as part of your counter-offer.
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="rounded-lg border border-purple-500/20 bg-background overflow-hidden shadow-sm">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-purple-500/10">
+                                <TableHead className="font-semibold">Material</TableHead>
+                                <TableHead className="font-semibold">Qty</TableHead>
+                                <TableHead className="font-semibold">Price</TableHead>
+                                <TableHead className="font-semibold">Seller Comments</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {selectedBid.lineItems?.map((item) => (
+                                <TableRow key={item.id} className="align-top hover:bg-purple-500/5 transition-colors">
+                                  <TableCell>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-medium">{item.materialName || `Material #${item.materialId}`}</p>
+                                        {item.urgency && item.urgency !== 'standard' && (
+                                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                            item.urgency === 'rush' 
+                                              ? 'bg-destructive/10 text-destructive' 
+                                              : 'bg-purple-500/10 text-purple-600'
+                                          }`}>
+                                            {item.urgency}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {item.materialType && (
+                                        <p className="text-xs text-muted-foreground">{item.materialType}</p>
+                                      )}
+                                      {item.itemNote && (
+                                        <p className="text-xs text-primary mt-1 italic">Buyer note: "{item.itemNote}"</p>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap font-medium">{item.quantity}</TableCell>
+                                  <TableCell className="whitespace-nowrap font-medium">
+                                    ${item.proposedUnitPrice.toFixed(2)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Textarea
+                                      className="min-h-[60px] text-xs border-purple-500/20 focus:border-purple-500/40 bg-background"
+                                      placeholder="Add a note about this line (e.g., suggest a different price, quantity, or alternative material)..."
+                                      value={counterNotes[item.id] ?? ""}
+                                      onChange={(e) =>
+                                        setCounterNotes((prev) => ({
+                                          ...prev,
+                                          [item.id]: e.target.value,
+                                        }))
+                                      }
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        <div className="space-y-2 pt-2">
+                          <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-purple-600" />
+                            Overall Counter Summary
+                          </label>
+                          <Textarea
+                            value={counterSummary}
+                            onChange={(e) => setCounterSummary(e.target.value)}
+                            placeholder="Summarize your counter-offer: key price changes, lead times, alternative suggestions, or conditions..."
+                            rows={3}
+                            className="bg-background border-purple-500/20 focus:border-purple-500/40"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 pt-2 border-t border-purple-500/10">
+                          <p className="text-xs text-muted-foreground max-w-md">
+                            When you send this counter, all line comments and the summary will be bundled and stored 
+                            as your seller response for this bid.
+                          </p>
+                          <Button
+                            variant="outline"
+                            className="border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:border-purple-500 shadow-sm hover:shadow-md transition-all"
+                            disabled={responding}
+                            onClick={() => {
+                              if (!selectedBid) return;
+
+                              const linesWithNotes = selectedBid.lineItems
+                                .filter((item) => counterNotes[item.id]?.trim())
+                                .map((item) => {
+                                  const note = counterNotes[item.id].trim();
+                                  return `- ${item.materialName || `Material #${item.materialId}`} (qty ${item.quantity}, $${item.proposedUnitPrice.toFixed(2)}): ${note}`;
+                                })
+                                .join("\n");
+
+                              const composed = [
+                                counterSummary.trim() && `Summary:\n${counterSummary.trim()}`,
+                                linesWithNotes && `\nLine item notes:\n${linesWithNotes}`,
+                              ]
+                                .filter(Boolean)
+                                .join("\n\n");
+
+                              void handleRespond('counter', composed || "Counter-offer with line-by-line comments (no additional text provided).");
+                            }}
+                            size="lg"
+                          >
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            Send Counter Offer
+                          </Button>
+                        </div>
+                          </>
+                        )}
+                      </>
+                    ) : selectedBid.status === 'countered' ? (
+                      <div className="py-10 text-center space-y-4">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 text-purple-700 border border-purple-500/30 text-sm font-medium">
+                          <Check className="w-4 h-4" />
+                          Bid successfully countered
+                        </div>
+                        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                          Your counter offer has been sent to the buyer. You can still review the details in the other tabs.
                         </p>
                       </div>
-                    </>
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${getStatusBadge(selectedBid.status)}`}>
-                        {selectedBid.status === 'accepted' && <Check className="w-4 h-4" />}
-                        {selectedBid.status === 'rejected' && <X className="w-4 h-4" />}
-                        {selectedBid.status === 'countered' && <MessageSquare className="w-4 h-4" />}
-                        Bid {getStatusLabel(selectedBid.status)}
+                    ) : (
+                      <div className="text-sm text-muted-foreground py-8 text-center">
+                        Countering is only available while the bid is in <span className="font-medium text-foreground">Response Needed</span> status.
                       </div>
-                      
-                      {selectedBid.sellerResponse && (
-                        <div className="mt-4 p-4 rounded-lg bg-muted/50 text-left">
-                          <p className="text-sm text-muted-foreground mb-1">Your response:</p>
-                          <p className="text-sm">{selectedBid.sellerResponse}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </TabsContent>
               </Tabs>
             </div>

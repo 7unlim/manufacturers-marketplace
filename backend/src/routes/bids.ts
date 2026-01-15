@@ -145,8 +145,9 @@ router.put('/:id', (req, res) => {
     return res.status(404).json({ error: 'Bid not found' });
   }
 
-  if (existing.status === 'submitted') {
-    return res.status(400).json({ error: 'Cannot edit a submitted bid' });
+  // Allow editing if draft or countered (buyer can respond to counter)
+  if (existing.status !== 'draft' && existing.status !== 'countered') {
+    return res.status(400).json({ error: 'Cannot edit a bid with this status' });
   }
 
   const totalAmount = calculateTotal(lineItems);
@@ -154,12 +155,19 @@ router.put('/:id', (req, res) => {
   const transaction = db.transaction(() => {
     db.prepare('DELETE FROM bid_line_items WHERE bidId = ?').run(bidId);
     const insertLine = db.prepare(
-      'INSERT INTO bid_line_items (bidId, materialId, quantity, proposedUnitPrice) VALUES (?, ?, ?, ?)'
+      'INSERT INTO bid_line_items (bidId, materialId, quantity, proposedUnitPrice, itemNote, urgency) VALUES (?, ?, ?, ?, ?, ?)'
     );
     for (const item of lineItems) {
-      insertLine.run(bidId, item.materialId, item.quantity, item.proposedUnitPrice);
+      insertLine.run(
+        bidId,
+        item.materialId,
+        item.quantity,
+        item.proposedUnitPrice,
+        item.itemNote || null,
+        item.urgency || 'standard'
+      );
     }
-    db.prepare('UPDATE bids SET totalAmount = ? WHERE id = ?').run(totalAmount, bidId);
+    db.prepare('UPDATE bids SET totalAmount = ?, status = ? WHERE id = ?').run(totalAmount, 'draft', bidId);
   });
 
   transaction();

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +25,10 @@ const Landing = () => {
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [revenueData] = useState(generateRevenueData);
   const [chartPeriod, setChartPeriod] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>('1Y');
+  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
+  const [animatedStats, setAnimatedStats] = useState({ companies: 0, materials: 0, uptime: 0, materialsTraded: 0 });
+  
+  const sectionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   
   const filteredChartData = useMemo(() => {
     const sliceMap = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12, 'ALL': 12 };
@@ -34,6 +38,64 @@ const Landing = () => {
   const previousRevenue = revenueData[revenueData.length - 2]?.revenue || 0;
   const revenueChange = previousRevenue ? ((currentRevenue - previousRevenue) / previousRevenue * 100).toFixed(1) : '0';
   const isPositive = Number(revenueChange) >= 0;
+
+  // Intersection Observer for scroll animations
+  useEffect(() => {
+    const observers: IntersectionObserver[] = [];
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -100px 0px'
+    };
+
+    Object.keys(sectionRefs.current).forEach((key) => {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setVisibleSections((prev) => new Set([...prev, key]));
+          }
+        });
+      }, observerOptions);
+
+      if (sectionRefs.current[key]) {
+        observer.observe(sectionRefs.current[key]!);
+        observers.push(observer);
+      }
+    });
+
+    return () => {
+      observers.forEach((obs) => obs.disconnect());
+    };
+  }, []);
+
+  // Animated counters
+  useEffect(() => {
+    if (visibleSections.has('stats')) {
+      const duration = 2000;
+      const steps = 60;
+      const interval = duration / steps;
+      
+      let step = 0;
+      const timer = setInterval(() => {
+        step++;
+        const progress = step / steps;
+        
+        setAnimatedStats({
+          companies: Math.floor(500 * progress),
+          materials: Math.floor(2.847 * progress * 1000),
+          uptime: Number((99.9 * progress).toFixed(1)),
+          materialsTraded: Math.floor(2000 * progress)
+        });
+
+        if (step >= steps) {
+          clearInterval(timer);
+          setAnimatedStats({ companies: 500, materials: 2847, uptime: 99.9, materialsTraded: 2000 });
+        }
+      }, interval);
+
+      return () => clearInterval(timer);
+    }
+  }, [visibleSections]);
+
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,8 +137,15 @@ const Landing = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6">
-        <div className="container mx-auto max-w-6xl">
+      <section className="pt-32 pb-20 px-6 relative overflow-hidden">
+        {/* Animated background orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl float" />
+          <div className="absolute top-40 right-20 w-96 h-96 bg-accent/10 rounded-full blur-3xl float-delayed" />
+          <div className="absolute bottom-20 left-1/3 w-64 h-64 bg-primary/5 rounded-full blur-3xl float" />
+        </div>
+
+        <div className="container mx-auto max-w-6xl relative z-10">
           <div className="text-center space-y-6 animate-fade-up">
             <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight">
               Manage Materials with Precision
@@ -89,21 +158,22 @@ const Landing = () => {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <Link to="/auth">
-                <Button variant="hero" size="xl" className="group">
+                <Button variant="hero" size="xl" className="group pulse-glow">
                   Start Free Trial
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Button variant="hero-outline" size="xl">
+              <Button variant="hero-outline" size="xl" className="group">
                 Watch Demo
+                <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </div>
           </div>
 
           {/* Hero Visual - Dashboard Preview */}
-          <div className="mt-16 relative animate-fade-up" style={{ animationDelay: "0.2s" }}>
-            <div className="absolute inset-0 gradient-hero opacity-5 rounded-3xl blur-3xl" />
-            <div className="relative bg-card rounded-2xl shadow-2xl border border-border overflow-hidden">
+          <div className="mt-16 relative float" style={{ animationDelay: "0.2s" }}>
+            <div className="absolute inset-0 gradient-hero opacity-10 rounded-3xl blur-3xl pulse-glow" />
+            <div className="relative bg-card rounded-2xl shadow-2xl border border-border overflow-hidden backdrop-blur-sm">
               <div className="h-12 bg-muted/50 flex items-center px-4 gap-2 border-b border-border">
                 <div className="w-3 h-3 rounded-full bg-destructive/60" />
                 <div className="w-3 h-3 rounded-full bg-accent/60" />
@@ -119,7 +189,7 @@ const Landing = () => {
                     <div className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">Live</div>
                   </div>
                 </div>
-
+                
                 {/* Revenue Chart */}
                 <div className="rounded-xl bg-muted/30 border border-border p-4">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
@@ -229,7 +299,7 @@ const Landing = () => {
                   ].map((stat, i) => (
                     <div key={i} className="p-4 rounded-xl bg-muted/50 border border-border">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs text-muted-foreground">{stat.label}</p>
+                      <p className="text-xs text-muted-foreground">{stat.label}</p>
                         <div className={`w-8 h-8 rounded-lg ${stat.color === 'accent' ? 'bg-accent' : 'gradient-hero'} flex items-center justify-center`}>
                           <stat.icon className={`w-4 h-4 ${stat.color === 'accent' ? 'text-accent-foreground' : 'text-primary-foreground'}`} />
                         </div>
@@ -246,9 +316,20 @@ const Landing = () => {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 px-6 bg-muted/30">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center space-y-4 mb-16">
+      <section id="features" className="py-20 px-6 bg-muted/30 relative overflow-hidden">
+        {/* Subtle background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `radial-gradient(circle at 2px 2px, hsl(var(--primary)) 1px, transparent 0)`,
+            backgroundSize: '40px 40px'
+          }} />
+        </div>
+
+        <div className="container mx-auto max-w-6xl relative z-10">
+          <div 
+            ref={(el) => { sectionRefs.current['features-header'] = el; }}
+            className={`text-center space-y-4 mb-16 animate-on-scroll slide-in-up ${visibleSections.has('features-header') ? 'visible' : ''}`}
+          >
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
               Everything You Need to Succeed
             </h2>
@@ -292,9 +373,11 @@ const Landing = () => {
             ].map((feature, i) => (
               <div 
                 key={i} 
-                className="group p-6 rounded-2xl bg-card border border-border hover-lift cursor-pointer"
+                ref={(el) => { sectionRefs.current[`feature-${i}`] = el; }}
+                className={`group p-6 rounded-2xl bg-card border border-border hover-lift cursor-pointer animate-on-scroll fade-in-scale ${visibleSections.has(`feature-${i}`) ? 'visible' : ''}`}
+                style={{ transitionDelay: `${i * 0.1}s` }}
               >
-                <div className="w-12 h-12 rounded-xl gradient-hero flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <div className="w-12 h-12 rounded-xl gradient-hero flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
                   <feature.icon className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <h3 className="font-display font-semibold text-lg text-foreground mb-2">{feature.title}</h3>
@@ -306,11 +389,14 @@ const Landing = () => {
       </section>
 
       {/* Mission Section */}
-      <section id="about" className="py-20 px-6">
+      <section id="about" className="py-20 px-6 relative">
         <div className="container mx-auto max-w-6xl">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left - Content */}
-            <div className="space-y-6">
+            <div 
+              ref={(el) => { sectionRefs.current['about-left'] = el; }}
+              className={`space-y-6 animate-on-scroll slide-in-left ${visibleSections.has('about-left') ? 'visible' : ''}`}
+            >
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 text-accent text-sm font-medium">
                 <Target className="w-4 h-4" />
                 Our Mission
@@ -329,14 +415,19 @@ const Landing = () => {
                 because we've lived them.
               </p>
               
-              <div className="grid grid-cols-3 gap-6 pt-4">
+              <div 
+                ref={(el) => { sectionRefs.current['stats'] = el; }}
+                className="grid grid-cols-3 gap-6 pt-4"
+              >
                 {[
-                  { value: "500+", label: "Companies" },
-                  { value: "$2B+", label: "Materials Traded" },
-                  { value: "99.9%", label: "Uptime" },
+                  { value: animatedStats.companies, suffix: "+", label: "Companies", animated: true },
+                  { value: animatedStats.materialsTraded, suffix: "B+", prefix: "$", label: "Materials Traded", animated: true },
+                  { value: animatedStats.uptime, suffix: "%", label: "Uptime", animated: true },
                 ].map((stat, i) => (
-                  <div key={i}>
-                    <p className="text-2xl md:text-3xl font-display font-bold text-primary">{stat.value}</p>
+                  <div key={i} className="transform transition-all duration-500 hover:scale-105">
+                    <p className="text-2xl md:text-3xl font-display font-bold text-primary">
+                      {stat.prefix || ''}{stat.animated && typeof stat.value === 'number' ? stat.value : stat.value}{stat.suffix || ''}
+                    </p>
                     <p className="text-sm text-muted-foreground">{stat.label}</p>
                   </div>
                 ))}
@@ -363,10 +454,12 @@ const Landing = () => {
                 },
               ].map((value, i) => (
                 <div 
-                  key={i} 
-                  className="flex gap-4 p-5 rounded-xl bg-card border border-border hover:border-primary/50 transition-colors"
+                  key={i}
+                  ref={(el) => { sectionRefs.current[`value-${i}`] = el; }}
+                  className={`flex gap-4 p-5 rounded-xl bg-card border border-border hover:border-primary/50 transition-all animate-on-scroll slide-in-right ${visibleSections.has(`value-${i}`) ? 'visible' : ''}`}
+                  style={{ transitionDelay: `${i * 0.15}s` }}
                 >
-                  <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                     <value.icon className="w-6 h-6 text-accent" />
                   </div>
                   <div>
@@ -381,9 +474,17 @@ const Landing = () => {
       </section>
 
       {/* Contact Section */}
-      <section id="contact" className="py-20 px-6 bg-muted/30">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center space-y-4 mb-12">
+      <section id="contact" className="py-20 px-6 bg-muted/30 relative overflow-hidden">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl float" />
+        </div>
+
+        <div className="container mx-auto max-w-6xl relative z-10">
+          <div 
+            ref={(el) => { sectionRefs.current['contact-header'] = el; }}
+            className={`text-center space-y-4 mb-12 animate-on-scroll slide-in-up ${visibleSections.has('contact-header') ? 'visible' : ''}`}
+          >
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground">
               Get in Touch
             </h2>
@@ -394,8 +495,11 @@ const Landing = () => {
 
           <div className="grid lg:grid-cols-5 gap-8">
             {/* Contact Info */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="p-6 rounded-2xl bg-card border border-border">
+            <div 
+              ref={(el) => { sectionRefs.current['contact-info'] = el; }}
+              className={`lg:col-span-2 space-y-6 animate-on-scroll slide-in-left ${visibleSections.has('contact-info') ? 'visible' : ''}`}
+            >
+              <div className="p-6 rounded-2xl bg-card border border-border shadow-lg">
                 <h3 className="font-display font-semibold text-lg text-foreground mb-4">Contact Information</h3>
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
@@ -447,8 +551,11 @@ const Landing = () => {
             </div>
 
             {/* Contact Form */}
-            <div className="lg:col-span-3">
-              <form onSubmit={handleContactSubmit} className="p-6 rounded-2xl bg-card border border-border">
+            <div 
+              ref={(el) => { sectionRefs.current['contact-form'] = el; }}
+              className={`lg:col-span-3 animate-on-scroll slide-in-right ${visibleSections.has('contact-form') ? 'visible' : ''}`}
+            >
+              <form onSubmit={handleContactSubmit} className="p-6 rounded-2xl bg-card border border-border shadow-lg">
                 <h3 className="font-display font-semibold text-lg text-foreground mb-6">Send us a Message</h3>
                 
                 {formSubmitted ? (
@@ -513,11 +620,15 @@ const Landing = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-6">
+      <section className="py-20 px-6 relative">
         <div className="container mx-auto max-w-4xl">
-          <div className="gradient-hero rounded-3xl p-8 md:p-12 text-center relative overflow-hidden">
+          <div 
+            ref={(el) => { sectionRefs.current['cta'] = el; }}
+            className={`gradient-hero rounded-3xl p-8 md:p-12 text-center relative overflow-hidden animate-on-scroll fade-in-scale ${visibleSections.has('cta') ? 'visible' : ''}`}
+          >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.1),transparent)]" />
-            <div className="relative space-y-6">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(255,255,255,0.05),transparent)]" />
+            <div className="relative space-y-6 z-10">
               <h2 className="font-display text-3xl md:text-4xl font-bold text-primary-foreground">
                 Ready to Transform Your Operations?
               </h2>
@@ -526,14 +637,16 @@ const Landing = () => {
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link to="/auth">
-                  <Button variant="secondary" size="lg" className="font-semibold">
+                  <Button variant="secondary" size="lg" className="font-semibold group hover:scale-105 transition-transform">
                     Start Free Trial
+                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
                 <a href="#contact">
-                  <Button variant="ghost" size="lg" className="text-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/10">
-                    Contact Sales
-                  </Button>
+                  <Button variant="ghost" size="lg" className="text-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/10 group">
+                  Contact Sales
+                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
                 </a>
               </div>
             </div>
@@ -548,8 +661,8 @@ const Landing = () => {
             {/* Brand */}
             <div className="md:col-span-1">
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 gradient-hero rounded-lg flex items-center justify-center">
-                  <Package className="w-5 h-5 text-primary-foreground" />
+              <div className="w-8 h-8 gradient-hero rounded-lg flex items-center justify-center">
+                <Package className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <span className="font-display font-bold text-lg text-foreground">Waypoint</span>
               </div>

@@ -144,12 +144,69 @@ body {
 
   .hover-lift {
     @apply transition-all duration-150;
-}
+  }
 
   .hover-lift:hover {
     @apply -translate-y-0.5;
     box-shadow: var(--shadow-md);
-}
+  }
+
+  /* Scroll-triggered animations */
+  .animate-on-scroll {
+    opacity: 0;
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+  }
+
+  .animate-on-scroll.visible {
+    opacity: 1;
+  }
+
+  .slide-in-left {
+    transform: translateX(-40px);
+  }
+
+  .slide-in-left.visible {
+    transform: translateX(0);
+  }
+
+  .slide-in-right {
+    transform: translateX(40px);
+  }
+
+  .slide-in-right.visible {
+    transform: translateX(0);
+  }
+
+  .slide-in-up {
+    transform: translateY(40px);
+  }
+
+  .slide-in-up.visible {
+    transform: translateY(0);
+  }
+
+  .fade-in-scale {
+    transform: scale(0.95);
+  }
+
+  .fade-in-scale.visible {
+    transform: scale(1);
+  }
+
+  /* Floating animation */
+  .float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .float-delayed {
+    animation: float 6s ease-in-out infinite;
+    animation-delay: 2s;
+  }
+
+  /* Pulse animation */
+  .pulse-glow {
+    animation: pulseGlow 3s ease-in-out infinite;
+  }
 }
 
 /* Subtle animations with minimal movement */
@@ -177,6 +234,69 @@ body {
   from {
     opacity: 0.8;
     transform: scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Professional animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.1);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(var(--primary) / 0.2);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
   }
   to {
     opacity: 1;

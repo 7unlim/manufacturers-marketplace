@@ -14,11 +14,15 @@ import BuyerHome from "./pages/buyer/BuyerHome";
 import BuyerCompanies from "./pages/buyer/BuyerCompanies";
 import BuyerBids from "./pages/buyer/BuyerBids";
 import BuyerBidsHistory from "./pages/buyer/BuyerBidsHistory";
+import BuyerProfile from "./pages/buyer/BuyerProfile";
+import BuyerSettings from "./pages/buyer/BuyerSettings";
 
 // Seller Pages
 import SellerDashboard from "./pages/seller/SellerDashboard";
 import SellerMaterials from "./pages/seller/SellerMaterials";
 import SellerBids from "./pages/seller/SellerBids";
+import SellerProfile from "./pages/seller/SellerProfile";
+import SellerSettings from "./pages/seller/SellerSettings";
 
 const queryClient = new QueryClient();
 
@@ -38,11 +42,15 @@ const App = () => (
           <Route path="/buyer/companies" element={<BuyerCompanies />} />
           <Route path="/buyer/bids" element={<BuyerBids />} />
           <Route path="/buyer/bids/history" element={<BuyerBidsHistory />} />
+          <Route path="/buyer/profile" element={<BuyerProfile />} />
+          <Route path="/buyer/settings" element={<BuyerSettings />} />
           
           {/* Seller Routes */}
           <Route path="/seller/dashboard" element={<SellerDashboard />} />
           <Route path="/seller/materials" element={<SellerMaterials />} />
           <Route path="/seller/bids" element={<SellerBids />} />
+          <Route path="/seller/profile" element={<SellerProfile />} />
+          <Route path="/seller/settings" element={<SellerSettings />} />
           
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />

@@ -223,13 +223,17 @@ const SellerDashboard = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem>
-                <User className="w-4 h-4 mr-2" />
-                Company Profile
+              <DropdownMenuItem asChild>
+                <Link to="/seller/profile" className="flex items-center">
+                  <User className="w-4 h-4 mr-2" />
+                  Company Profile
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
+              <DropdownMenuItem asChild>
+                <Link to="/seller/settings" className="flex items-center">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>

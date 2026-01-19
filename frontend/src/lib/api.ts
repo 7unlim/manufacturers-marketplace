@@ -241,7 +241,8 @@ export type RevenueDataPoint = {
   label: string;
   revenue: number;
   count: number;
-};export type RevenueResponse = {
+};
+export type RevenueResponse = {
   period: string;
   data: RevenueDataPoint[];
   totalRevenue: number;
@@ -270,5 +271,51 @@ export const findMaterialsWithAI = (description: string): Promise<MaterialSearch
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ description }),
+  }).then(handleResponse);
+};
+
+export type AuthAccount = {
+  email: string;
+  name: string;
+  role: 'buyer' | 'seller';
+  companyId?: number;
+  company?: Company;
+};
+
+export type SignUpPayload = {
+  email: string;
+  password: string;
+  name: string;
+  role: 'buyer' | 'seller';
+  companyId?: number;
+};
+
+export type SignInPayload = {
+  email: string;
+  password: string;
+};
+
+export type AuthResponse = {
+  message: string;
+  account: AuthAccount;
+};
+
+export const signUp = (payload: SignUpPayload): Promise<AuthResponse> => {
+  return fetch(`${baseUrl}/api/auth/signup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  }).then(handleResponse);
+};
+
+export const signIn = (payload: SignInPayload): Promise<AuthResponse> => {
+  return fetch(`${baseUrl}/api/auth/signin`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
   }).then(handleResponse);
 };

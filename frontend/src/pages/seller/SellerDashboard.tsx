@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
 import { 
   Package, Building2, ChevronDown, LogOut, Settings, User, 
-  Factory, Inbox, TrendingUp, DollarSign
+  Factory, Inbox, TrendingUp, DollarSign, Info
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -22,29 +22,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { fetchCompanies, fetchMaterials, fetchBids, updateCompany, type Company, type Material, type Bid } from "@/lib/api";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
+import { fetchCompanies, fetchMaterials, fetchBids, updateCompany, fetchRevenueData, type Company, type Material, type Bid, type RevenueResponse } from "@/lib/api";
 
 const SELLER_COMPANY_ID = 1;
-
-// Mock revenue data for the chart
-const generateRevenueData = () => {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  let value = 45000;
-  return months.map((month) => {
-    value = value + Math.random() * 8000 - 2000;
-    value = Math.max(value, 30000);
-    return { month, revenue: Math.round(value) };
-  });
-};
 
 const SellerDashboard = () => {
   const [company, setCompany] = useState<Company | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
-  const [revenueData] = useState(generateRevenueData);
-  const [chartPeriod, setChartPeriod] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>('1Y');
+  const [revenueData, setRevenueData] = useState<RevenueResponse | null>(null);
+  const [loadingRevenue, setLoadingRevenue] = useState(true);
+  const [chartPeriod, setChartPeriod] = useState<'1D' | '1W' | '1M' | '3M' | 'YTD' | '1Y' | 'ALL'>('1Y');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Partial<Company>>({});
   const [saving, setSaving] = useState(false);
@@ -70,6 +65,20 @@ const SellerDashboard = () => {
     };
     loadData();
   }, []);
+
+  // Fetch revenue data when period changes
+  useEffect(() => {
+    setLoadingRevenue(true);
+    fetchRevenueData(chartPeriod)
+      .then(data => {
+        setRevenueData(data);
+        setLoadingRevenue(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch revenue data:', err);
+        setLoadingRevenue(false);
+      });
+  }, [chartPeriod]);
 
   const stats = useMemo(() => {
     const totalInventoryValue = materials.reduce((sum, m) => sum + (m.stock * m.baseUnitPrice), 0);
@@ -111,15 +120,31 @@ const SellerDashboard = () => {
     return labels[status] ?? status;
   };
   
-  const currentRevenue = revenueData[revenueData.length - 1]?.revenue || 0;
-  const previousRevenue = revenueData[revenueData.length - 2]?.revenue || 0;
-  const revenueChange = previousRevenue ? ((currentRevenue - previousRevenue) / previousRevenue * 100).toFixed(1) : '0';
-  const isPositive = Number(revenueChange) >= 0;
+  const chartData = useMemo(() => {
+    if (!revenueData) return [];
+    
+    // Calculate cumulative revenue for each point (reset at window start)
+    let cumulative = 0;
+    return revenueData.data.map(point => {
+      cumulative += point.revenue;
+      return {
+        label: point.label,
+        revenue: point.revenue, // Event revenue (for bars)
+        cumulative: cumulative, // Cumulative revenue (for line)
+        count: point.count // Event count
+      };
+    });
+  }, [revenueData]);
 
-  const filteredChartData = useMemo(() => {
-    const sliceMap = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12, 'ALL': 12 };
-    return revenueData.slice(-sliceMap[chartPeriod]);
-  }, [revenueData, chartPeriod]);
+  // Use percentage change from backend (rolling window comparison)
+  const totalRevenue = revenueData?.totalRevenue || 0;
+  const revenueChange = revenueData?.revenueChange || 0;
+  const isPositive = revenueChange >= 0;
+  
+  // Format the change display
+  const revenueChangeDisplay = revenueChange !== 0
+    ? `${isPositive ? '+' : ''}${Math.round(revenueChange)}%`
+    : '0%';
 
   const handleEditProfile = () => {
     if (company) {
@@ -243,17 +268,33 @@ const SellerDashboard = () => {
                   <p className="text-sm text-muted-foreground">Total Revenue</p>
                   <div className="flex items-baseline gap-3">
                     <span className="text-3xl md:text-4xl font-display font-bold text-foreground">
-                      ${currentRevenue.toLocaleString()}
+                      ${loadingRevenue ? '...' : totalRevenue.toLocaleString()}
                     </span>
-                    <span className={`flex items-center text-sm font-medium ${isPositive ? 'text-green-500' : 'text-destructive'}`}>
-                      <TrendingUp className={`w-4 h-4 mr-1 ${!isPositive && 'rotate-180'}`} />
-                      {isPositive ? '+' : ''}{revenueChange}%
-                    </span>
+                    {(chartData.length > 1 || chartPeriod === 'YTD') && (
+                      <span className={`flex items-center text-sm font-medium ${isPositive ? 'text-green-500' : 'text-destructive'}`}>
+                        <TrendingUp className={`w-4 h-4 mr-1 ${!isPositive && 'rotate-180'}`} />
+                        {revenueChangeDisplay}
+                        <Tooltip delayDuration={200}>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="ml-1.5 inline-flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                              <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[280px]">
+                            <p className="text-xs leading-relaxed">
+                              <span className="font-semibold">Percentage Change:</span> Compares total revenue in the selected period to the immediately preceding period of equal length. For example, 1M compares last 30 days vs. the 30 days before that.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Past 12 months</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {loadingRevenue ? 'Loading...' : `${revenueData?.totalBids || 0} accepted bids`}
+                  </p>
                 </div>
-                <div className="flex gap-1">
-                  {(['1M', '3M', '6M', '1Y', 'ALL'] as const).map((period) => (
+                <div className="flex gap-1 flex-wrap">
+                  {(['1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'] as const).map((period) => (
                     <button
                       key={period}
                       onClick={() => setChartPeriod(period)}
@@ -270,44 +311,103 @@ const SellerDashboard = () => {
               </div>
               
               <div className="h-[200px] md:h-[280px] -mx-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={filteredChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(38 92% 50%)" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="hsl(38 92% 50%)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis 
-                      dataKey="month" 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 12, fill: 'hsl(215 16% 47%)' }}
-                      dy={10}
-                    />
-                    <YAxis 
-                      hide
-                      domain={['dataMin - 5000', 'dataMax + 5000']}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        fontSize: '12px'
-                      }}
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
-                      labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="hsl(38 92% 50%)"
-                      strokeWidth={2}
-                      fill="url(#revenueGradient)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {loadingRevenue ? (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    Loading revenue data...
+                  </div>
+                ) : chartData.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    No revenue data available for this period
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={chartData} margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
+                      <defs>
+                        <linearGradient id="revenueBarGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(38 92% 55%)" stopOpacity={1} />
+                          <stop offset="100%" stopColor="hsl(38 92% 45%)" stopOpacity={1} />
+                        </linearGradient>
+                        <filter id="barShadow">
+                          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="hsl(38 92% 50%)" floodOpacity="0.15" />
+                        </filter>
+                      </defs>
+                      <XAxis 
+                        dataKey="label" 
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fill: 'hsl(215 16% 47%)', fontWeight: 500 }}
+                        dy={10}
+                        angle={chartPeriod === '1D' ? -45 : 0}
+                        height={chartPeriod === '1D' ? 60 : 36}
+                        interval={chartPeriod === '1D' ? 6 : chartPeriod === '1W' ? 2 : chartPeriod === '1M' ? 5 : chartPeriod === '3M' ? 10 : chartPeriod === 'ALL' ? Math.floor(chartData.length / 6) : 'preserveStartEnd'}
+                      />
+                      <YAxis 
+                        hide
+                        yAxisId="revenue"
+                        domain={[0, 'dataMax + Math.max(1000, dataMax * 0.1)']}
+                      />
+                      <YAxis 
+                        hide
+                        yAxisId="cumulative"
+                        orientation="right"
+                        domain={[0, 'dataMax + Math.max(1000, dataMax * 0.1)']}
+                      />
+                      <RechartsTooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                          padding: '12px',
+                          boxShadow: '0 4px 12px hsl(var(--foreground) / 0.08)'
+                        }}
+                        cursor={{ fill: 'hsl(var(--accent) / 0.1)', stroke: 'hsl(var(--accent))', strokeWidth: 1, strokeDasharray: '3 3' }}
+                        formatter={(value: number, name: string, props: any) => {
+                          if (name === 'revenue') {
+                            return [`$${value.toLocaleString()}`, 'Event Revenue'];
+                          } else if (name === 'cumulative') {
+                            return [`$${value.toLocaleString()}`, 'Cumulative'];
+                          }
+                          return [value, name];
+                        }}
+                        labelStyle={{ 
+                          color: 'hsl(var(--foreground))', 
+                          fontWeight: 600, 
+                          marginBottom: '4px',
+                          fontSize: '12px'
+                        }}
+                        itemStyle={{ padding: '2px 0' }}
+                      />
+                      {/* Event markers (bars) - primary visual */}
+                      <Bar
+                        yAxisId="revenue"
+                        dataKey="revenue"
+                        fill="url(#revenueBarGradient)"
+                        radius={[4, 4, 0, 0]}
+                        opacity={0.95}
+                        filter="url(#barShadow)"
+                      />
+                      {/* Cumulative overlay line - secondary, de-emphasized */}
+                      <Line
+                        yAxisId="cumulative"
+                        type="monotone"
+                        dataKey="cumulative"
+                        stroke="hsl(221 83% 53%)"
+                        strokeWidth={2}
+                        strokeOpacity={0.35}
+                        strokeDasharray="4 4"
+                        dot={false}
+                        activeDot={{ 
+                          r: 4, 
+                          fill: 'hsl(221 83% 53%)', 
+                          stroke: 'hsl(var(--card))', 
+                          strokeWidth: 2,
+                          opacity: 0.8
+                        }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
 

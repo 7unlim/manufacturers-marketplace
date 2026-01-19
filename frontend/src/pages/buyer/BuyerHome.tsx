@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "react-router-dom";
-import { Search, Package, Users, Building2, ChevronDown, LogOut, Settings, User, Plus, Sparkles, ShoppingCart, Shield, Award, FileText } from "lucide-react";
+import { Search, Package, Users, Building2, ChevronDown, LogOut, Settings, User, Plus, Sparkles, ShoppingCart, Shield, Award, FileText, Wand2, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +32,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { fetchCompanies, fetchMaterials, type Company, type Material } from "@/lib/api";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import { fetchCompanies, fetchMaterials, findMaterialsWithAI, type Company, type Material, type MaterialMatch } from "@/lib/api";
 
 const BuyerHome = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -42,6 +51,10 @@ const BuyerHome = () => {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [aiFinderOpen, setAiFinderOpen] = useState(false);
+  const [aiDescription, setAiDescription] = useState("");
+  const [aiMatches, setAiMatches] = useState<MaterialMatch[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -92,6 +105,22 @@ const BuyerHome = () => {
       return JSON.parse(company.certifications);
     } catch {
       return [];
+    }
+  };
+
+  const handleAISearch = async () => {
+    if (!aiDescription.trim()) return;
+    
+    setAiLoading(true);
+    setAiMatches([]);
+    try {
+      const result = await findMaterialsWithAI(aiDescription);
+      setAiMatches(result.matches || []);
+    } catch (error) {
+      console.error("Failed to find materials with AI:", error);
+      alert("Failed to search materials. Please try again.");
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -238,6 +267,136 @@ const BuyerHome = () => {
                 className="pl-10 bg-card"
               />
             </div>
+
+            <Sheet open={aiFinderOpen} onOpenChange={setAiFinderOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="bg-card">
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  AI Finder
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>AI Material Finder</SheetTitle>
+                  <SheetDescription>
+                    Describe what you're looking for and AI will find the most compatible materials from our inventory.
+                  </SheetDescription>
+                </SheetHeader>
+                
+                <div className="mt-6 space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Material Description</label>
+                    <Textarea
+                      placeholder="e.g., High-strength aluminum alloy for aerospace applications requiring corrosion resistance..."
+                      value={aiDescription}
+                      onChange={(e) => setAiDescription(e.target.value)}
+                      className="min-h-[120px] bg-card"
+                      disabled={aiLoading}
+                    />
+                  </div>
+                  
+                  <Button 
+                    onClick={handleAISearch} 
+                    disabled={!aiDescription.trim() || aiLoading}
+                    className="w-full"
+                  >
+                    {aiLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Finding matches...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Find Materials
+                      </>
+                    )}
+                  </Button>
+
+                  {aiMatches.length > 0 && (
+                    <div className="space-y-4 mt-6">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-lg text-foreground">Found {aiMatches.length} Match{aiMatches.length !== 1 ? 'es' : ''}</h3>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Sparkles className="w-3.5 h-3.5 text-accent" />
+                          <span>AI-Powered Results</span>
+                        </div>
+                      </div>
+                      {aiMatches.map((match, index) => (
+                        <div key={match.id} className="group relative p-5 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-md transition-all duration-200 space-y-4">
+                          {/* Badge for match rank */}
+                          <div className="absolute top-4 right-4 flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-xs font-bold shadow-sm">
+                            {index + 1}
+                          </div>
+
+                          {/* Header */}
+                          <div className="pr-10">
+                            <div className="flex items-start justify-between gap-4 mb-2">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-lg text-foreground mb-1.5">{match.name}</h4>
+                                <div className="flex flex-wrap items-center gap-2 text-sm">
+                                  <span className="px-2.5 py-1 rounded-md bg-primary/10 text-primary font-medium text-xs">
+                                    {match.type}
+                                  </span>
+                                  <code className="px-2.5 py-1 rounded-md bg-muted text-muted-foreground font-mono text-xs">
+                                    {match.code}
+                                  </code>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                              <Building2 className="w-4 h-4" />
+                              <span>{match.companyName}</span>
+                            </div>
+                          </div>
+
+                          {/* Price & Stock Info */}
+                          <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 border border-border/50">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground mb-0.5">Price</p>
+                              <p className="text-lg font-bold text-foreground">${match.baseUnitPrice.toFixed(2)}</p>
+                            </div>
+                            <div className="w-px h-8 bg-border"></div>
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground mb-0.5">Stock Available</p>
+                              <p className="text-lg font-semibold text-foreground">{match.stock.toLocaleString()} units</p>
+                            </div>
+                          </div>
+                          
+                          {/* AI Reasoning */}
+                          <div className="p-4 rounded-lg bg-accent/5 border border-accent/20">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Sparkles className="w-4 h-4 text-accent" />
+                              <p className="text-sm font-semibold text-foreground">Why this matches:</p>
+                            </div>
+                            <p className="text-sm text-foreground leading-relaxed">{match.reasoning}</p>
+                          </div>
+                          
+                          {/* Description */}
+                          <div className="pt-2 pb-1">
+                            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{match.description}</p>
+                          </div>
+
+                          {/* Action Button */}
+                          <div className="pt-2">
+                            <Link 
+                              to={`/buyer/bids?materialId=${match.id}&companyId=${match.companyId}`}
+                              className="block"
+                              onClick={() => setAiFinderOpen(false)}
+                            >
+                              <Button className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors" size="sm" variant="default">
+                                <ShoppingCart className="w-4 h-4 mr-2" />
+                                Add to Bid
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
 

@@ -237,3 +237,40 @@ export const updateBidDetails = (
   }).then(handleResponse);
 };
 
+export type RevenueDataPoint = {
+  label: string;
+  revenue: number;
+  count: number;
+};
+
+export type RevenueResponse = {
+  period: string;
+  data: RevenueDataPoint[];
+  totalRevenue: number;
+  totalBids: number;
+  revenueChange: number;
+  previousWindowRevenue?: number; // For edge case handling (R_prev === 0)
+};
+
+export const fetchRevenueData = (period: string = '1Y'): Promise<RevenueResponse> => {
+  return fetch(`${baseUrl}/api/stats/revenue?period=${period}`).then(handleResponse);
+};
+
+export type MaterialMatch = Material & {
+  reasoning: string;
+};
+
+export type MaterialSearchResponse = {
+  query: string;
+  matches: MaterialMatch[];
+};
+
+export const findMaterialsWithAI = (description: string): Promise<MaterialSearchResponse> => {
+  return fetch(`${baseUrl}/api/ai/find-materials`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ description }),
+  }).then(handleResponse);
+};

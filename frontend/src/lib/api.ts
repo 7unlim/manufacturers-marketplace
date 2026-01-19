@@ -241,9 +241,7 @@ export type RevenueDataPoint = {
   label: string;
   revenue: number;
   count: number;
-};
-
-export type RevenueResponse = {
+};export type RevenueResponse = {
   period: string;
   data: RevenueDataPoint[];
   totalRevenue: number;

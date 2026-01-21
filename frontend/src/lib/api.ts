@@ -141,6 +141,33 @@ export const fetchMaterials = (filters: MaterialFilterOptions = {}): Promise<Mat
   return fetch(url).then(handleResponse);
 };
 
+export type CreateMaterialPayload = {
+  companyId: number;
+  code?: string;
+  name: string;
+  type: string;
+  description?: string;
+  stock: number;
+  baseUnitPrice: number;
+  costPerUnit?: number;
+  leadTimeDays: number;
+};
+
+export type CreateMaterialResponse = Material & {
+  autoMappedCode?: boolean;
+  mappedToCode?: string | null;
+};
+
+export const createMaterial = (payload: CreateMaterialPayload): Promise<CreateMaterialResponse> => {
+  return fetch(`${baseUrl}/api/materials`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  }).then(handleResponse);
+};
+
 export const requestAiBid = (payload: {
   companyId: number;
   lineItems: BidItemPayload[];

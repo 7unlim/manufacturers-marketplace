@@ -27,7 +27,7 @@ import { Link } from "react-router-dom";
 import { 
   Package, Building2, ChevronDown, LogOut, Settings, User, 
   Factory, Inbox, Plus, Search, Edit, Trash2, Upload, FileSpreadsheet,
-  Camera, CheckCircle, AlertCircle, Loader2
+  Camera, CheckCircle, AlertCircle, Loader2, Info
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -36,7 +36,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { fetchCompanies, fetchMaterials, type Company, type Material } from "@/lib/api";
+import { fetchCompanies, fetchMaterials, createMaterial, type Company, type Material } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const SELLER_COMPANY_ID = 1;
 
@@ -56,6 +58,7 @@ type ImportResult = {
 };
 
 const SellerMaterials = () => {
+  const { toast } = useToast();
   const [company, setCompany] = useState<Company | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +70,18 @@ const SellerMaterials = () => {
     parsedData: [],
     message: ''
   });
+  const [addMaterialOpen, setAddMaterialOpen] = useState(false);
+  const [newMaterial, setNewMaterial] = useState({
+    code: "",
+    name: "",
+    type: "",
+    description: "",
+    stock: "",
+    baseUnitPrice: "",
+    costPerUnit: "",
+    leadTimeDays: "",
+  });
+  const [isCreating, setIsCreating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,8 +107,114 @@ const SellerMaterials = () => {
 
   const filteredMaterials = materials.filter(m =>
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.type.toLowerCase().includes(searchTerm.toLowerCase())
+    m.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (m.code && m.code.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const handleAddMaterial = async () => {
+    // Validate required fields
+    const name = newMaterial.name.trim();
+    const type = newMaterial.type.trim();
+    const stock = newMaterial.stock.trim();
+    const baseUnitPrice = newMaterial.baseUnitPrice.trim();
+    const leadTimeDays = newMaterial.leadTimeDays.trim();
+
+    if (!name || !type || !stock || !baseUnitPrice || !leadTimeDays) {
+      const missingFields = [];
+      if (!name) missingFields.push("Material Name");
+      if (!type) missingFields.push("Type");
+      if (!stock) missingFields.push("Stock");
+      if (!baseUnitPrice) missingFields.push("Unit Price");
+      if (!leadTimeDays) missingFields.push("Lead Time");
+      
+      toast({
+        title: "Missing required fields",
+        description: `Please fill in: ${missingFields.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate numeric fields
+    if (isNaN(Number(stock)) || Number(stock) < 0) {
+      toast({
+        title: "Invalid stock value",
+        description: "Stock must be a valid number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(Number(baseUnitPrice)) || Number(baseUnitPrice) <= 0) {
+      toast({
+        title: "Invalid unit price",
+        description: "Unit price must be a valid positive number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(Number(leadTimeDays)) || Number(leadTimeDays) < 0) {
+      toast({
+        title: "Invalid lead time",
+        description: "Lead time must be a valid number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const response = await createMaterial({
+        companyId: SELLER_COMPANY_ID,
+        code: newMaterial.code.trim() || undefined,
+        name,
+        type,
+        description: newMaterial.description.trim() || undefined,
+        stock: Number(stock),
+        baseUnitPrice: Number(baseUnitPrice),
+        costPerUnit: newMaterial.costPerUnit.trim() ? Number(newMaterial.costPerUnit) : undefined,
+        leadTimeDays: Number(leadTimeDays),
+      });
+
+      // Refresh materials list
+      const materialsData = await fetchMaterials({ companyId: SELLER_COMPANY_ID });
+      setMaterials(materialsData.filter(m => m.companyId === SELLER_COMPANY_ID));
+
+      // Reset form and close dialog
+      setNewMaterial({
+        code: "",
+        name: "",
+        type: "",
+        description: "",
+        stock: "",
+        baseUnitPrice: "",
+        costPerUnit: "",
+        leadTimeDays: "",
+      });
+      setAddMaterialOpen(false);
+
+      if (response.autoMappedCode) {
+        toast({
+          title: "Material created successfully",
+          description: `Material code was automatically mapped to: ${response.mappedToCode}`,
+        });
+      } else {
+        toast({
+          title: "Material created successfully",
+          description: "Your new material has been added to inventory",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Failed to create material",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   // Simulate parsing an Excel file (CSV format for simplicity)
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -441,14 +562,14 @@ const SellerMaterials = () => {
               </DialogContent>
             </Dialog>
 
-            <Dialog>
+            <Dialog open={addMaterialOpen} onOpenChange={setAddMaterialOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Material
                 </Button>
               </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Material</DialogTitle>
                 <DialogDescription>
@@ -456,36 +577,121 @@ const SellerMaterials = () => {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Material Code:</strong> If you don't provide a material code, the system will automatically map it to an existing material code based on similar name or type. This helps maintain consistency across your inventory.
+                  </AlertDescription>
+                </Alert>
+
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Material Name</label>
-                  <Input placeholder="e.g., Carbon Steel Sheet" />
+                  <label className="text-sm font-medium">
+                    Material Code <span className="text-muted-foreground text-xs">(Optional)</span>
+                  </label>
+                  <Input 
+                    placeholder="e.g., ASTM A36" 
+                    value={newMaterial.code}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, code: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Standard code or identifier for this material (e.g., ASTM, UL, ISO standards)
+                  </p>
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Material Name <span className="text-destructive">*</span></label>
+                  <Input 
+                    placeholder="e.g., Carbon Steel Sheet" 
+                    value={newMaterial.name}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, name: e.target.value })}
+                    required
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Type</label>
-                    <Input placeholder="e.g., Metal" />
+                    <label className="text-sm font-medium">Type <span className="text-destructive">*</span></label>
+                    <Input 
+                      placeholder="e.g., Metal" 
+                      value={newMaterial.type}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, type: e.target.value })}
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Stock</label>
-                    <Input type="number" placeholder="0" />
+                    <label className="text-sm font-medium">Stock <span className="text-destructive">*</span></label>
+                    <Input 
+                      type="number" 
+                      placeholder="0" 
+                      value={newMaterial.stock}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, stock: e.target.value })}
+                      required
+                    />
                   </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Unit Price ($)</label>
-                    <Input type="number" step="0.01" placeholder="0.00" />
+                    <label className="text-sm font-medium">Unit Price ($) <span className="text-destructive">*</span></label>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      placeholder="0.00" 
+                      value={newMaterial.baseUnitPrice}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, baseUnitPrice: e.target.value })}
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Lead Time (days)</label>
-                    <Input type="number" placeholder="7" />
+                    <label className="text-sm font-medium">Cost Per Unit ($) <span className="text-muted-foreground text-xs">(Optional)</span></label>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      placeholder="Auto-calculated" 
+                      value={newMaterial.costPerUnit}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, costPerUnit: e.target.value })}
+                    />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Description</label>
-                  <Input placeholder="Brief description..." />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Lead Time (days) <span className="text-destructive">*</span></label>
+                    <Input 
+                      type="number" 
+                      placeholder="7" 
+                      value={newMaterial.leadTimeDays}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, leadTimeDays: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
-                <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                  Add Material
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Description <span className="text-muted-foreground text-xs">(Optional)</span></label>
+                  <Input 
+                    placeholder="Brief description..." 
+                    value={newMaterial.description}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, description: e.target.value })}
+                  />
+                </div>
+
+                <Button 
+                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" 
+                  onClick={handleAddMaterial}
+                  disabled={isCreating}
+                >
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Material
+                    </>
+                  )}
                 </Button>
               </div>
             </DialogContent>

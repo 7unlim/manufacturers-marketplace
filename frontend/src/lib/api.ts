@@ -1,11 +1,33 @@
 const baseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 const handleResponse = async (response: Response) => {
+  console.log('[API] handleResponse called, status:', response.status, 'ok:', response.ok);
   if (!response.ok) {
     const text = await response.text();
+    console.error('[API] handleResponse error - response not ok:', text);
     throw new Error(text || 'API request failed');
   }
-  return response.json();
+  const data = await response.json();
+  console.log('[API] handleResponse parsed JSON:', {
+    isArray: Array.isArray(data),
+    length: Array.isArray(data) ? data.length : 'not an array',
+    type: typeof data,
+    constructor: data?.constructor?.name,
+    keys: data && typeof data === 'object' ? Object.keys(data) : 'N/A'
+  });
+  
+  // For buyer-leads endpoint, ensure we return an array
+  if (response.url.includes('buyer-leads') && !Array.isArray(data)) {
+    console.warn('[API] handleResponse WARNING: buyer-leads response is not an array, converting:', data);
+    // If it's an object with a data property, use that
+    if (data && typeof data === 'object' && Array.isArray(data.data)) {
+      return data.data;
+    }
+    // Otherwise return empty array
+    return [];
+  }
+  
+  return data;
 };
 
 export type Company = {
@@ -278,8 +300,12 @@ export type RevenueResponse = {
   previousWindowRevenue?: number; // For edge case handling (R_prev === 0)
 };
 
-export const fetchRevenueData = (period: string = '1Y'): Promise<RevenueResponse> => {
-  return fetch(`${baseUrl}/api/stats/revenue?period=${period}`).then(handleResponse);
+export const fetchRevenueData = (period: string = '1Y', companyId?: number): Promise<RevenueResponse> => {
+  const params = new URLSearchParams({ period });
+  if (companyId) {
+    params.set('companyId', String(companyId));
+  }
+  return fetch(`${baseUrl}/api/stats/revenue?${params.toString()}`).then(handleResponse);
 };
 
 export type MaterialMatch = Material & {
@@ -307,6 +333,21 @@ export type AuthAccount = {
   role: 'buyer' | 'seller';
   companyId?: number;
   company?: Company;
+  onboarding?: OnboardingData | BuyerOnboardingData;
+};
+
+export type OnboardingData = {
+  projectTypes: string[];
+  role: string[];
+  specialCategories: string[];
+};
+
+export type BuyerOnboardingData = {
+  materialTypes: string[];
+  buyerProjectTypes: string[];
+  projectScale: string[];
+  budgetRange?: string;
+  urgencyLevel?: string;
 };
 
 export type SignUpPayload = {
@@ -315,6 +356,7 @@ export type SignUpPayload = {
   name: string;
   role: 'buyer' | 'seller';
   companyId?: number;
+  onboarding?: OnboardingData;
 };
 
 export type SignInPayload = {
@@ -344,5 +386,125 @@ export const signIn = (payload: SignInPayload): Promise<AuthResponse> => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
+  }).then(handleResponse);
+};
+
+export type BuyerLead = {
+  email: string;
+  name: string;
+  role: 'buyer';
+  onboarding?: BuyerOnboardingData;
+};
+
+export const fetchBuyerLeads = (): Promise<BuyerLead[]> => {
+  const url = `${baseUrl}/api/auth/buyer-leads`;
+  console.log('[API] fetchBuyerLeads called, URL:', url);
+  
+  return fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+    .then(response => {
+      console.log('[API] fetchBuyerLeads response status:', response.status, response.statusText);
+      console.log('[API] fetchBuyerLeads response ok:', response.ok);
+      return handleResponse(response);
+    })
+    .then(data => {
+      console.log('[API] fetchBuyerLeads parsed data:', {
+        isArray: Array.isArray(data),
+        length: Array.isArray(data) ? data.length : 'not an array',
+        type: typeof data
+      });
+      return data;
+    })
+    .catch(error => {
+      console.error('[API] fetchBuyerLeads error:', error);
+      throw error;
+    });
+};
+
+export type UpdatePreferencesPayload = {
+  email: string;
+  onboarding: OnboardingData | BuyerOnboardingData;
+};
+
+export const updatePreferences = (payload: UpdatePreferencesPayload): Promise<AuthResponse> => {
+  return fetch(`${baseUrl}/api/auth/preferences`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  }).then(handleResponse);
+};
+
+export type Conversation = {
+  otherEmail: string;
+  otherName: string;
+  otherRole: 'buyer' | 'seller';
+  lastMessageTime: string;
+  lastMessage: string;
+  unreadCount: number;
+};
+
+export type Message = {
+  id: number;
+  senderEmail: string;
+  senderName: string;
+  senderRole: 'buyer' | 'seller';
+  recipientEmail: string;
+  recipientName: string;
+  recipientRole: 'buyer' | 'seller';
+  content: string;
+  read: boolean;
+  createdAt: string;
+};
+
+export type SendMessagePayload = {
+  senderEmail: string;
+  senderName: string;
+  senderRole: 'buyer' | 'seller';
+  recipientEmail: string;
+  recipientName: string;
+  recipientRole: 'buyer' | 'seller';
+  content: string;
+};
+
+export const fetchConversations = (email: string): Promise<Conversation[]> => {
+  return fetch(`${baseUrl}/api/messages/conversations/${encodeURIComponent(email)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  }).then(handleResponse);
+};
+
+export const fetchMessages = (email: string, otherEmail: string): Promise<Message[]> => {
+  return fetch(`${baseUrl}/api/messages/messages/${encodeURIComponent(email)}/${encodeURIComponent(otherEmail)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  }).then(handleResponse);
+};
+
+export const sendMessage = (payload: SendMessagePayload): Promise<Message> => {
+  return fetch(`${baseUrl}/api/messages/send`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  }).then(handleResponse);
+};
+
+export const markMessagesAsRead = (email: string, otherEmail: string): Promise<{ success: boolean }> => {
+  return fetch(`${baseUrl}/api/messages/mark-read/${encodeURIComponent(email)}/${encodeURIComponent(otherEmail)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
   }).then(handleResponse);
 };

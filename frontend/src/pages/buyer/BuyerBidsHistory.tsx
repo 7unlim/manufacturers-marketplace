@@ -22,7 +22,7 @@ import {
   Package, Building2, ChevronDown, LogOut, Settings, User, 
   Sparkles, ShoppingCart, FileText, Eye, Edit2, X, Clock,
   CheckCircle2, XCircle, MessageSquare, AlertCircle, Truck,
-  CreditCard, MapPin, RefreshCw, Send
+  CreditCard, MapPin, RefreshCw, Send, Home
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -69,6 +69,7 @@ const BuyerBidsHistory = () => {
   const [bidToCancel, setBidToCancel] = useState<Bid | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [buyerName, setBuyerName] = useState<string>("Buyer Account");
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -95,6 +96,18 @@ const BuyerBidsHistory = () => {
   }>>([]);
 
   useEffect(() => {
+    // Load buyer account info
+    const authAccount = localStorage.getItem("authAccount");
+    if (authAccount) {
+      try {
+        const account = JSON.parse(authAccount);
+        if (account.name) {
+          setBuyerName(account.name);
+        }
+      } catch (error) {
+        console.error("Error parsing auth account:", error);
+      }
+    }
     loadBids();
   }, []);
 
@@ -263,17 +276,24 @@ const BuyerBidsHistory = () => {
             </Link>
 
             <div className="hidden md:flex items-center gap-1">
+              <Link to="/buyer/home">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <Home className="w-4 h-4 mr-2" />
+                  Home
+                </Button>
+              </Link>
+              <span className="text-border">|</span>
+              <Link to="/buyer/materials">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <Package className="w-4 h-4 mr-2" />
+                  Materials
+                </Button>
+              </Link>
+              <span className="text-border">|</span>
               <Link to="/buyer/companies">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <Building2 className="w-4 h-4 mr-2" />
                   Companies
-                </Button>
-              </Link>
-              <span className="text-border">|</span>
-              <Link to="/buyer/home">
-                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-                  <Package className="w-4 h-4 mr-2" />
-                  Materials
                 </Button>
               </Link>
               <span className="text-border">|</span>
@@ -294,7 +314,7 @@ const BuyerBidsHistory = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-3 px-3">
-                <span className="text-sm font-medium">Buyer Account</span>
+                <span className="text-sm font-medium">{buyerName}</span>
                 <div className="w-9 h-9 rounded-full gradient-hero flex items-center justify-center">
                   <User className="w-5 h-5 text-primary-foreground" />
                 </div>

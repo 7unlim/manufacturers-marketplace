@@ -65,6 +65,25 @@ CREATE TABLE IF NOT EXISTS bid_line_items (
   FOREIGN KEY(bidId) REFERENCES bids(id),
   FOREIGN KEY(materialId) REFERENCES materials(id)
 );
+
+CREATE TABLE IF NOT EXISTS messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  senderEmail TEXT NOT NULL,
+  senderName TEXT NOT NULL,
+  senderRole TEXT NOT NULL,
+  recipientEmail TEXT NOT NULL,
+  recipientName TEXT NOT NULL,
+  recipientRole TEXT NOT NULL,
+  content TEXT NOT NULL,
+  read BOOLEAN DEFAULT 0,
+  createdAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS account_preferences (
+  email TEXT PRIMARY KEY,
+  onboarding TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
 `);
 
 // Migration: Add new columns if they don't exist

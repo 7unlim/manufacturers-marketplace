@@ -4,19 +4,22 @@ import { db } from '../db';
 const router = Router();
 
 router.get('/revenue', (req, res) => {
-  const { period = '1Y' } = req.query;
+  const { period = '1Y', companyId } = req.query;
   
   // Calculate date range based on period
   const now = new Date();
   let startDate: Date;
   let groupBy: 'hour' | 'day' | 'month' | 'year' = 'month';
   
+  // Build WHERE clause for company filter
+  const companyFilter = companyId ? `AND companyId = ${Number(companyId)}` : '';
+  
   // For ALL period, find the earliest accepted bid date
   if (period === 'ALL') {
     const earliestBidQuery = `
       SELECT MIN(createdAt) as earliestDate
       FROM bids
-      WHERE status = 'accepted'
+      WHERE status = 'accepted' ${companyFilter}
     `;
     const earliestResult = db.prepare(earliestBidQuery).get() as { earliestDate: string | null } | undefined;
     
@@ -81,6 +84,7 @@ router.get('/revenue', (req, res) => {
     FROM bids
     WHERE status = 'accepted' 
       AND datetime(createdAt) >= datetime(?)
+      ${companyFilter}
     GROUP BY periodKey
     ORDER BY periodKey ASC
   `;
@@ -167,6 +171,7 @@ router.get('/revenue', (req, res) => {
           FROM bids
           WHERE status = 'accepted' 
             AND datetime(createdAt) >= datetime(?)
+            ${companyFilter}
         `;
         const currentYearResult = db.prepare(currentYearQuery).get(currentYearStart.toISOString()) as { revenue: number } | undefined;
         const R_curr = Number(currentYearResult?.revenue || 0);
@@ -178,6 +183,7 @@ router.get('/revenue', (req, res) => {
           WHERE status = 'accepted' 
             AND datetime(createdAt) >= datetime(?)
             AND datetime(createdAt) < datetime(?)
+            ${companyFilter}
         `;
         const previousYearResult = db.prepare(previousYearQuery).get(
           previousYearStart.toISOString(),
@@ -224,6 +230,7 @@ router.get('/revenue', (req, res) => {
       WHERE status = 'accepted' 
         AND datetime(createdAt) >= datetime(?)
         AND datetime(createdAt) < datetime(?)
+        ${companyFilter}
     `;
     const currentWindowResult = db.prepare(currentWindowQuery).get(
       currentWindowStart.toISOString(),
@@ -238,6 +245,7 @@ router.get('/revenue', (req, res) => {
       WHERE status = 'accepted' 
         AND datetime(createdAt) >= datetime(?)
         AND datetime(createdAt) < datetime(?)
+        ${companyFilter}
     `;
     const previousWindowResult = db.prepare(previousWindowQuery).get(
       previousWindowStart.toISOString(),

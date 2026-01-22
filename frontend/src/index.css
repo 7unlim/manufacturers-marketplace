@@ -120,7 +120,7 @@ body {
 
   .shadow-glow {
     box-shadow: var(--shadow-glow);
-  }
+}
 
   .text-gradient {
     @apply bg-clip-text text-transparent;
@@ -136,7 +136,7 @@ body {
 
   .animate-fade-in {
     animation: fadeIn 0.15s ease-out forwards;
-  }
+}
 
   .animate-scale-in {
     animation: scaleIn 0.15s ease-out forwards;
@@ -201,7 +201,7 @@ body {
   .float-delayed {
     animation: float 6s ease-in-out infinite;
     animation-delay: 2s;
-  }
+}
 
   /* Pulse animation */
   .pulse-glow {
@@ -214,7 +214,7 @@ body {
   from {
     opacity: 0.6;
     transform: translateY(4px);
-  }
+}
   to {
     opacity: 1;
     transform: translateY(0);

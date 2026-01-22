@@ -27,7 +27,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { 
   Package, Building2, ChevronDown, LogOut, Settings, User, 
   Sparkles, Trash2, Plus, Send, Wand2, ShoppingCart,
-  Truck, MessageSquare, AlertCircle, 
+  Truck, MessageSquare, AlertCircle, Home, 
   Zap, TrendingDown, CheckCircle2, Lightbulb,
   BarChart3, PenLine, RefreshCw, ChevronRight, ChevronLeft, Check,
   MapPin, CreditCard, FileText, X, PartyPopper
@@ -81,8 +81,8 @@ const BuyerBids = () => {
   const [loading, setLoading] = useState(true);
   
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
-  const [buyerName, setBuyerName] = useState("Enterprise Procurement");
-  const [buyerEmail, setBuyerEmail] = useState("procurement@enterprise.com");
+  const [buyerName, setBuyerName] = useState("Buyer Account");
+  const [buyerEmail, setBuyerEmail] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
   const [lineItems, setLineItems] = useState<BidLineItem[]>([]);
   
@@ -133,6 +133,22 @@ const BuyerBids = () => {
   ];
 
   useEffect(() => {
+    // Load buyer account info
+    const authAccount = localStorage.getItem("authAccount");
+    if (authAccount) {
+      try {
+        const account = JSON.parse(authAccount);
+        if (account.name) {
+          setBuyerName(account.name);
+        }
+        if (account.email) {
+          setBuyerEmail(account.email);
+        }
+      } catch (error) {
+        console.error("Error parsing auth account:", error);
+      }
+    }
+
     const loadData = async () => {
       try {
         const [companiesData, materialsData] = await Promise.all([
@@ -557,17 +573,24 @@ const BuyerBids = () => {
             </Link>
 
             <div className="hidden md:flex items-center gap-1">
+              <Link to="/buyer/home">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <Home className="w-4 h-4 mr-2" />
+                  Home
+                </Button>
+              </Link>
+              <span className="text-border">|</span>
+              <Link to="/buyer/materials">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <Package className="w-4 h-4 mr-2" />
+                  Materials
+                </Button>
+              </Link>
+              <span className="text-border">|</span>
               <Link to="/buyer/companies">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <Building2 className="w-4 h-4 mr-2" />
                   Companies
-                </Button>
-              </Link>
-              <span className="text-border">|</span>
-              <Link to="/buyer/home">
-                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-                  <Package className="w-4 h-4 mr-2" />
-                  Materials
                 </Button>
               </Link>
               <span className="text-border">|</span>
@@ -588,7 +611,7 @@ const BuyerBids = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-3 px-3">
-                <span className="text-sm font-medium">Buyer Account</span>
+                <span className="text-sm font-medium">{buyerName}</span>
                 <div className="w-9 h-9 rounded-full gradient-hero flex items-center justify-center">
                   <User className="w-5 h-5 text-primary-foreground" />
                 </div>

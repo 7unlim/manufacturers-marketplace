@@ -48,8 +48,6 @@ import {
 } from "@/lib/api";
 import confetti from "canvas-confetti";
 
-const SELLER_COMPANY_ID = 1;
-
 const SellerBids = () => {
   const [company, setCompany] = useState<Company | null>(null);
   const [bids, setBids] = useState<Bid[]>([]);
@@ -63,18 +61,50 @@ const SellerBids = () => {
   const [counterSummary, setCounterSummary] = useState("");
   const [justCountered, setJustCountered] = useState(false);
   const [activeTab, setActiveTab] = useState<"items" | "details" | "respond" | "counter">("items");
+  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [accountName, setAccountName] = useState<string>("");
 
   useEffect(() => {
+    // Load seller account info to get companyId
+    const authAccount = localStorage.getItem("authAccount");
+    let sellerCompanyId: number | null = null;
+    
+    if (authAccount) {
+      try {
+        const account = JSON.parse(authAccount);
+        if (account.companyId) {
+          sellerCompanyId = account.companyId;
+          setCompanyId(sellerCompanyId);
+        }
+        if (account.name) {
+          setAccountName(account.name);
+        }
+        if (account.company) {
+          setCompany(account.company);
+        }
+      } catch (error) {
+        console.error("Error parsing auth account:", error);
+      }
+    }
+
     const loadData = async () => {
+      if (!sellerCompanyId) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const [companiesData, bidsData] = await Promise.all([
           fetchCompanies(),
           fetchBids()
         ]);
         
-        const myCompany = companiesData.find(c => c.id === SELLER_COMPANY_ID);
-        setCompany(myCompany || null);
-        setBids(bidsData.filter(b => b.companyId === SELLER_COMPANY_ID));
+        setCompany(prevCompany => {
+          if (prevCompany) return prevCompany;
+          const myCompany = companiesData.find(c => c.id === sellerCompanyId);
+          return myCompany || null;
+        });
+        setBids(bidsData.filter(b => b.companyId === sellerCompanyId));
       } catch (error) {
         console.error("Failed to load data:", error);
       } finally {
@@ -228,7 +258,7 @@ const SellerBids = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-3 px-3">
-                <span className="text-sm font-medium">{company?.name || "Seller"}</span>
+                <span className="text-sm font-medium">{company?.name || accountName || "Seller Account"}</span>
                 <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center">
                   <User className="w-5 h-5 text-accent-foreground" />
                 </div>

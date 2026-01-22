@@ -1,12 +1,15 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
 import { 
   Package, Building2, ChevronDown, LogOut, Settings, User, 
-  Factory, Inbox, TrendingUp, DollarSign, Info
+  Factory, Inbox, TrendingUp, DollarSign, Info, Users, Target, Star, Edit, Mail, Phone, AlertCircle, MessageSquare, Send
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,9 +31,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
-import { fetchCompanies, fetchMaterials, fetchBids, updateCompany, fetchRevenueData, type Company, type Material, type Bid, type RevenueResponse } from "@/lib/api";
-
-const SELLER_COMPANY_ID = 1;
+import { fetchCompanies, fetchMaterials, fetchBids, updateCompany, fetchRevenueData, fetchBuyerLeads, sendMessage, type Company, type Material, type Bid, type RevenueResponse, type BuyerLead, type OnboardingData } from "@/lib/api";
 
 const SellerDashboard = () => {
   const [company, setCompany] = useState<Company | null>(null);
@@ -43,42 +44,332 @@ const SellerDashboard = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Partial<Company>>({});
   const [saving, setSaving] = useState(false);
+  const [buyerLeads, setBuyerLeads] = useState<BuyerLead[]>([]);
+  const [sellerOnboarding, setSellerOnboarding] = useState<OnboardingData | null>(null);
+  const [sellerCompanyId, setSellerCompanyId] = useState<number | null>(null);
+  const [accountName, setAccountName] = useState<string>("");
+  const [sellerEmail, setSellerEmail] = useState<string>("");
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [selectedBuyer, setSelectedBuyer] = useState<BuyerLead | null>(null);
+  const [messageText, setMessageText] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [showAllRecommended, setShowAllRecommended] = useState(false);
+
+  // Debug: Track buyerLeads changes
+  useEffect(() => {
+    console.log('Dashboard - buyerLeads state changed:', {
+      count: buyerLeads.length,
+      leads: buyerLeads,
+      sampleEmails: buyerLeads.slice(0, 3).map(b => b?.email)
+    });
+  }, [buyerLeads]);
+
+  // Function to refresh onboarding data from localStorage
+  const refreshOnboardingData = useCallback(() => {
+    const authAccount = localStorage.getItem("authAccount");
+    console.log('Dashboard - refreshOnboardingData called');
+    if (authAccount) {
+      try {
+        const account = JSON.parse(authAccount);
+        console.log('Dashboard - Account from localStorage:', { hasOnboarding: !!account.onboarding, onboarding: account.onboarding });
+        if (account.onboarding) {
+          console.log('Dashboard - Setting sellerOnboarding:', account.onboarding);
+          setSellerOnboarding(account.onboarding);
+        } else {
+          console.log('Dashboard - No onboarding data in account');
+        }
+      } catch (error) {
+        console.error("Error parsing auth account:", error);
+      }
+    } else {
+      console.log('Dashboard - No authAccount in localStorage');
+    }
+  }, []);
 
   useEffect(() => {
+    // Load seller account info to get companyId
+    const authAccount = localStorage.getItem("authAccount");
+    let companyId: number | null = null;
+    
+    if (authAccount) {
+      try {
+        const account = JSON.parse(authAccount);
+        if (account.companyId) {
+          companyId = account.companyId;
+          setSellerCompanyId(companyId);
+        }
+        if (account.name) {
+          setAccountName(account.name);
+        }
+        if (account.email) {
+          setSellerEmail(account.email);
+        }
+        if (account.company) {
+          // Use company from account if available
+          setCompany(account.company);
+        }
+        if (account.onboarding) {
+          console.log('Dashboard - Initial load: Setting sellerOnboarding from localStorage:', account.onboarding);
+          setSellerOnboarding(account.onboarding);
+        } else {
+          console.log('Dashboard - Initial load: No onboarding data in account');
+        }
+      } catch (error) {
+        console.error("Error parsing auth account:", error);
+      }
+    }
+
+    // Function to load buyer leads (doesn't require companyId)
+    const loadBuyerLeads = async () => {
+      try {
+        console.log('Dashboard - Fetching buyer leads from API...');
+        console.log('Dashboard - API URL should be: http://localhost:4000/api/auth/buyer-leads');
+        
+        const leadsData = await fetchBuyerLeads();
+        
+        console.log('Dashboard - Buyer leads API response received:', {
+          isArray: Array.isArray(leadsData),
+          count: Array.isArray(leadsData) ? leadsData.length : 'not an array',
+          type: typeof leadsData,
+          constructor: leadsData?.constructor?.name,
+          data: leadsData
+        });
+        
+        // Ensure we have an array
+        const leadsArray = Array.isArray(leadsData) ? leadsData : [];
+        
+        console.log('Dashboard - Setting buyerLeads with:', {
+          count: leadsArray.length,
+          sampleEmails: leadsArray.slice(0, 3).map(b => b?.email || 'no email'),
+          withOnboarding: leadsArray.filter(b => b?.onboarding).length,
+          withoutOnboarding: leadsArray.filter(b => !b?.onboarding).length,
+          firstBuyer: leadsArray[0] || null
+        });
+        
+        if (leadsArray.length === 0) {
+          console.warn('Dashboard - WARNING: API returned empty array. Check backend console for logs.');
+        }
+        
+        setBuyerLeads(leadsArray);
+        console.log('Dashboard - setBuyerLeads called with', leadsArray.length, 'leads');
+      } catch (leadsError) {
+        console.error('Dashboard - Error fetching buyer leads:', leadsError);
+        console.error('Dashboard - Error details:', {
+          message: leadsError instanceof Error ? leadsError.message : 'Unknown error',
+          name: leadsError instanceof Error ? leadsError.name : undefined,
+          stack: leadsError instanceof Error ? leadsError.stack : undefined,
+          error: leadsError
+        });
+        // Set empty array on error so the component doesn't break
+        setBuyerLeads([]);
+      }
+    };
+
     const loadData = async () => {
+      console.log('Dashboard - loadData called, companyId:', companyId);
+      
+      // Always load buyer leads, regardless of companyId
+      loadBuyerLeads();
+      
+      if (!companyId) {
+        console.log('Dashboard - loadData: No companyId, skipping companies/materials/bids but buyer leads loaded');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Dashboard - loadData: Starting to fetch companies, materials, bids...');
       try {
         const [companiesData, materialsData, bidsData] = await Promise.all([
           fetchCompanies(),
-          fetchMaterials({ companyId: SELLER_COMPANY_ID }),
+          fetchMaterials({ companyId }),
           fetchBids()
         ]);
+        console.log('Dashboard - loadData: Fetched companies, materials, bids successfully');
         
-        const myCompany = companiesData.find(c => c.id === SELLER_COMPANY_ID);
-        setCompany(myCompany || null);
-        setMaterials(materialsData.filter(m => m.companyId === SELLER_COMPANY_ID));
-        setBids(bidsData.filter(b => b.companyId === SELLER_COMPANY_ID));
+        // If company wasn't set from account, find it from companies list
+        setCompany(prevCompany => {
+          if (prevCompany) return prevCompany;
+          const myCompany = companiesData.find(c => c.id === companyId);
+          return myCompany || null;
+        });
+        setMaterials(materialsData.filter(m => m.companyId === companyId));
+        setBids(bidsData.filter(b => b.companyId === companyId));
+        
+        // Refresh onboarding data after loading buyer leads to ensure we have latest data
+        refreshOnboardingData();
+        console.log('Dashboard - loadData: Completed successfully');
       } catch (error) {
-        console.error("Failed to load data:", error);
+        console.error("Dashboard - Failed to load data:", error);
+        console.error("Dashboard - Error details:", {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
       } finally {
         setLoading(false);
+        console.log('Dashboard - loadData: Finished (finally block)');
       }
     };
+    console.log('Dashboard - useEffect: About to call loadData');
     loadData();
+  }, []);
+
+  // Refresh onboarding data when component becomes visible or on focus
+  useEffect(() => {
+    refreshOnboardingData();
+    
+    const handleFocus = () => {
+      refreshOnboardingData();
+    };
+    
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'authAccount') {
+        refreshOnboardingData();
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // Fetch revenue data when period changes
   useEffect(() => {
+    if (!sellerCompanyId) {
+      // Set empty data if no companyId
+      setRevenueData({
+        period: chartPeriod,
+        data: [],
+        totalRevenue: 0,
+        periodTotalRevenue: 0,
+        revenueChange: 0,
+        totalBids: 0,
+      });
+      setLoadingRevenue(false);
+      return;
+    }
     setLoadingRevenue(true);
-    fetchRevenueData(chartPeriod)
+    fetchRevenueData(chartPeriod, sellerCompanyId)
       .then(data => {
         setRevenueData(data);
         setLoadingRevenue(false);
       })
       .catch(err => {
         console.error('Failed to fetch revenue data:', err);
+        // Set empty data on error
+        setRevenueData({
+          period: chartPeriod,
+          data: [],
+          totalRevenue: 0,
+          periodTotalRevenue: 0,
+          revenueChange: 0,
+          totalBids: 0,
+        });
         setLoadingRevenue(false);
       });
-  }, [chartPeriod]);
+  }, [chartPeriod, sellerCompanyId]);
+
+  // Calculate recommended buyers - using the same logic as SellerProfile
+  const calculateRecommendedBuyers = useCallback((leads: BuyerLead[], sellerPrefs: OnboardingData): BuyerLead[] => {
+    const calculateMatchScore = (buyer: BuyerLead): number => {
+      if (!buyer.onboarding) return 0;
+      
+      let score = 0;
+      const buyerPrefs = buyer.onboarding;
+
+      // Match project types
+      if (sellerPrefs.projectTypes && buyerPrefs.buyerProjectTypes) {
+        const sellerProjectTypes = sellerPrefs.projectTypes.map(t => t.toLowerCase());
+        const buyerProjectTypes = buyerPrefs.buyerProjectTypes.map(t => t.toLowerCase().replace(/^.*? - /, ''));
+        
+        const matches = sellerProjectTypes.some(sellerType => {
+          return buyerProjectTypes.some(buyerType => {
+            if ((sellerType.includes('residential') || sellerType.includes('single-family') || sellerType.includes('apartments')) &&
+                (buyerType.includes('home') || buyerType.includes('residential'))) return true;
+            if (sellerType.includes('commercial') && buyerType.includes('commercial')) return true;
+            if (sellerType.includes('industrial') && buyerType.includes('industrial')) return true;
+            if ((sellerType.includes('infrastructure') || sellerType.includes('civil')) &&
+                (buyerType.includes('infrastructure') || buyerType.includes('civil'))) return true;
+            if ((sellerType.includes('high-rise') || sellerType.includes('skyscraper')) &&
+                (buyerType.includes('high-rise') || buyerType.includes('tower'))) return true;
+            return false;
+          });
+        });
+        
+        if (matches) score += 15;
+      }
+
+      // Match seller role with buyer project scale
+      if (sellerPrefs.role && buyerPrefs.projectScale) {
+        const sellerRoles = sellerPrefs.role.map(r => r.toLowerCase());
+        const buyerScales = buyerPrefs.projectScale.map(s => s.toLowerCase());
+        
+        if ((sellerRoles.some(r => r.includes('general contractor') || r.includes('design-build') || r.includes('epc'))) &&
+            buyerScales.some(s => s.includes('large') || s.includes('enterprise'))) {
+          score += 10;
+        }
+        if (sellerRoles.some(r => r.includes('subcontractor'))) {
+          score += 5;
+        }
+      }
+
+      // Match special categories
+      if (sellerPrefs.specialCategories && buyerPrefs.buyerProjectTypes) {
+        const specialCats = sellerPrefs.specialCategories.map(c => c.toLowerCase());
+        const buyerProjects = buyerPrefs.buyerProjectTypes.map(p => p.toLowerCase());
+        
+        if (specialCats.includes('green construction firms') && 
+            buyerProjects.some(p => p.includes('green') || p.includes('sustainable'))) {
+          score += 10;
+        }
+        if (specialCats.includes('renovation / remodeling companies') &&
+            buyerProjects.some(p => p.includes('home') || p.includes('residential'))) {
+          score += 10;
+        }
+      }
+
+      return score;
+    };
+
+    return leads
+      .map(buyer => ({
+        buyer,
+        score: calculateMatchScore(buyer)
+      }))
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.buyer);
+  }, []);
+
+  // Get recommended buyers based on preferences
+  const recommendedBuyers = useMemo(() => {
+    // Debug logging
+    console.log('Dashboard - Calculating recommended buyers:', {
+      hasOnboarding: !!sellerOnboarding,
+      buyerLeadsCount: buyerLeads.length,
+      sellerOnboarding: sellerOnboarding,
+      buyerLeads: buyerLeads
+    });
+    
+    if (!sellerOnboarding) {
+      console.log('Dashboard - Early return: missing sellerOnboarding');
+      return [];
+    }
+    
+    if (buyerLeads.length === 0) {
+      console.log('Dashboard - Early return: buyerLeads is empty');
+      return [];
+    }
+    
+    // Pass all buyer leads to calculation function (it handles filtering internally)
+    // This matches the original SellerProfile behavior
+    const recommended = calculateRecommendedBuyers(buyerLeads, sellerOnboarding);
+    console.log('Dashboard - Recommended buyers calculated:', recommended.length, recommended);
+    return recommended;
+  }, [buyerLeads, sellerOnboarding, calculateRecommendedBuyers]);
 
   const stats = useMemo(() => {
     const totalInventoryValue = materials.reduce((sum, m) => sum + (m.stock * m.baseUnitPrice), 0);
@@ -90,9 +381,11 @@ const SellerDashboard = () => {
       totalStock: materials.reduce((sum, m) => sum + m.stock, 0),
       inventoryValue: totalInventoryValue,
       pendingBids,
-      totalBidValue
+      totalBidValue,
+      recommendedLeads: recommendedBuyers.length,
+      totalLeads: buyerLeads.length
     };
-  }, [materials, bids]);
+  }, [materials, bids, recommendedBuyers, buyerLeads]);
 
   const recentBids = bids.slice(0, 5);
 
@@ -121,7 +414,15 @@ const SellerDashboard = () => {
   };
   
   const chartData = useMemo(() => {
-    if (!revenueData) return [];
+    if (!revenueData || revenueData.data.length === 0) {
+      // Return a single data point with 0 values
+      return [{
+        label: 'No Data',
+        revenue: 0,
+        cumulative: 0,
+        count: 0
+      }];
+    }
     
     // Calculate cumulative revenue for each point (reset at window start)
     let cumulative = 0;
@@ -179,32 +480,32 @@ const SellerDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
             <Link to="/" className="flex items-center gap-2">
               <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
                 <Factory className="w-5 h-5 text-accent-foreground" />
               </div>
-              <span className="font-display font-bold text-xl text-foreground">Waypoint</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">Seller</span>
+              <span className="font-display font-bold text-xl text-slate-900">Marketplace</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Seller</span>
             </Link>
 
             <div className="hidden md:flex items-center gap-1">
-              <Button variant="ghost" className="text-primary font-medium">
+              <Button variant="ghost" className="text-indigo-600 font-medium">
                 <Building2 className="w-4 h-4 mr-2" />
                 Dashboard
               </Button>
-              <span className="text-border">|</span>
+              <span className="text-slate-300">|</span>
               <Link to="/seller/materials">
-                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" className="text-slate-600 hover:text-slate-900">
                   <Package className="w-4 h-4 mr-2" />
                   Materials
                 </Button>
               </Link>
-              <span className="text-border">|</span>
+              <span className="text-slate-300">|</span>
               <Link to="/seller/bids">
-                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" className="text-slate-600 hover:text-slate-900">
                   <Inbox className="w-4 h-4 mr-2" />
                   Bid Inbox
                 </Button>
@@ -215,7 +516,7 @@ const SellerDashboard = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-3 px-3">
-                <span className="text-sm font-medium">{company?.name || "Seller"}</span>
+                <span className="text-sm font-medium">{company?.name || accountName || "Seller Account"}</span>
                 <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center">
                   <User className="w-5 h-5 text-accent-foreground" />
                 </div>
@@ -250,297 +551,534 @@ const SellerDashboard = () => {
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
         {loading ? (
-          <div className="h-64 flex items-center justify-center text-muted-foreground">
+          <div className="h-64 flex items-center justify-center text-slate-500">
             Loading...
           </div>
         ) : (
           <>
-            {/* Welcome */}
+            {/* Welcome Section with Preferences */}
             <div className="mb-6">
-              <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
-                Welcome back, {company?.name}
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                Here's an overview of your materials and incoming bids
-              </p>
-            </div>
-
-            {/* Revenue Chart - Robinhood Style */}
-            <div className="rounded-xl bg-card border border-border p-6 mb-6">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+              <div className="flex items-start justify-between mb-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-3xl md:text-4xl font-display font-bold text-foreground">
-                      ${loadingRevenue ? '...' : totalRevenue.toLocaleString()}
-                    </span>
-                    {(chartData.length > 1 || chartPeriod === 'YTD') && (
-                      <span className={`flex items-center text-sm font-medium ${isPositive ? 'text-green-500' : 'text-destructive'}`}>
-                        <TrendingUp className={`w-4 h-4 mr-1 ${!isPositive && 'rotate-180'}`} />
-                        {revenueChangeDisplay}
-                        <Tooltip delayDuration={200}>
-                          <TooltipTrigger asChild>
-                            <button type="button" className="ml-1.5 inline-flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
-                              <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-[280px]">
-                            <p className="text-xs leading-relaxed">
-                              <span className="font-semibold">Percentage Change:</span> Compares total revenue in the selected period to the immediately preceding period of equal length. For example, 1M compares last 30 days vs. the 30 days before that.
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {loadingRevenue ? 'Loading...' : `${revenueData?.totalBids || 0} accepted bids`}
+                  <h1 className="font-display text-2xl md:text-3xl font-bold text-slate-900">
+                    Welcome back, {company?.name || accountName || "Seller"}
+                  </h1>
+                  <p className="text-slate-600 mt-1">
+                    Here's an overview of your materials, bids, and potential buyers
                   </p>
                 </div>
-                <div className="flex gap-1 flex-wrap">
-                  {(['1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'] as const).map((period) => (
-                    <button
-                      key={period}
-                      onClick={() => setChartPeriod(period)}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                        chartPeriod === period 
-                          ? 'bg-accent text-accent-foreground' 
-                          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {period}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="h-[200px] md:h-[280px] -mx-2">
-                {loadingRevenue ? (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
-                    Loading revenue data...
-                  </div>
-                ) : chartData.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
-                    No revenue data available for this period
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={chartData} margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
-                      <defs>
-                        <linearGradient id="revenueBarGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(38 92% 55%)" stopOpacity={1} />
-                          <stop offset="100%" stopColor="hsl(38 92% 45%)" stopOpacity={1} />
-                        </linearGradient>
-                        <filter id="barShadow">
-                          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="hsl(38 92% 50%)" floodOpacity="0.15" />
-                        </filter>
-                      </defs>
-                      <XAxis 
-                        dataKey="label" 
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 11, fill: 'hsl(215 16% 47%)', fontWeight: 500 }}
-                        dy={10}
-                        angle={chartPeriod === '1D' ? -45 : 0}
-                        height={chartPeriod === '1D' ? 60 : 36}
-                        interval={chartPeriod === '1D' ? 6 : chartPeriod === '1W' ? 2 : chartPeriod === '1M' ? 5 : chartPeriod === '3M' ? 10 : chartPeriod === 'ALL' ? Math.floor(chartData.length / 6) : 'preserveStartEnd'}
-                      />
-                      <YAxis 
-                        hide
-                        yAxisId="revenue"
-                        domain={[0, 'dataMax + Math.max(1000, dataMax * 0.1)']}
-                      />
-                      <YAxis 
-                        hide
-                        yAxisId="cumulative"
-                        orientation="right"
-                        domain={[0, 'dataMax + Math.max(1000, dataMax * 0.1)']}
-                      />
-                      <RechartsTooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '10px',
-                          fontSize: '13px',
-                          padding: '12px',
-                          boxShadow: '0 4px 12px hsl(var(--foreground) / 0.08)'
-                        }}
-                        cursor={{ fill: 'hsl(var(--accent) / 0.1)', stroke: 'hsl(var(--accent))', strokeWidth: 1, strokeDasharray: '3 3' }}
-                        formatter={(value: number, name: string, props: any) => {
-                          if (name === 'revenue') {
-                            return [`$${value.toLocaleString()}`, 'Event Revenue'];
-                          } else if (name === 'cumulative') {
-                            return [`$${value.toLocaleString()}`, 'Cumulative'];
-                          }
-                          return [value, name];
-                        }}
-                        labelStyle={{ 
-                          color: 'hsl(var(--foreground))', 
-                          fontWeight: 600, 
-                          marginBottom: '4px',
-                          fontSize: '12px'
-                        }}
-                        itemStyle={{ padding: '2px 0' }}
-                      />
-                      {/* Event markers (bars) - primary visual */}
-                      <Bar
-                        yAxisId="revenue"
-                        dataKey="revenue"
-                        fill="url(#revenueBarGradient)"
-                        radius={[4, 4, 0, 0]}
-                        opacity={0.95}
-                        filter="url(#barShadow)"
-                      />
-                      {/* Cumulative overlay line - secondary, de-emphasized */}
-                      <Line
-                        yAxisId="cumulative"
-                        type="monotone"
-                        dataKey="cumulative"
-                        stroke="hsl(221 83% 53%)"
-                        strokeWidth={2}
-                        strokeOpacity={0.35}
-                        strokeDasharray="4 4"
-                        dot={false}
-                        activeDot={{ 
-                          r: 4, 
-                          fill: 'hsl(221 83% 53%)', 
-                          stroke: 'hsl(var(--card))', 
-                          strokeWidth: 2,
-                          opacity: 0.8
-                        }}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
+                {!sellerOnboarding && (
+                  <Link to="/seller/profile">
+                    <Button variant="outline" size="sm">
+                      <Edit className="w-4 h-4 mr-2" />
+                      Set Preferences
+                    </Button>
+                  </Link>
                 )}
               </div>
+
+              {/* Preferences Display */}
+              {sellerOnboarding && (
+                <Card className="border-indigo-200 bg-gradient-to-r from-indigo-50 to-blue-50 mb-6">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Target className="w-5 h-5 text-amber-600" />
+                        Your Company Profile
+                      </CardTitle>
+                      <Link to="/seller/profile">
+                        <Button variant="ghost" size="sm">
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </Button>
+                      </Link>
+                    </div>
+                    <CardDescription>
+                      We use this to match you with relevant buyers
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {sellerOnboarding.projectTypes?.slice(0, 3).map((type, idx) => (
+                        <Badge key={idx} variant="secondary" className="bg-indigo-100 text-indigo-700 border-indigo-200">
+                          {type.replace(/^.*? - /, '')}
+                        </Badge>
+                      ))}
+                      {sellerOnboarding.role?.slice(0, 2).map((role, idx) => (
+                        <Badge key={idx} variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200">
+                          {role}
+                        </Badge>
+                      ))}
+                      {sellerOnboarding.specialCategories?.slice(0, 2).map((cat, idx) => (
+                        <Badge key={idx} variant="outline" className="border-green-300 text-green-700">
+                          {cat}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!sellerOnboarding && (
+                <Alert className="mb-6 border-indigo-200 bg-indigo-50">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-900">
+                    <strong>Get matched with buyers!</strong> Set your company preferences in your{" "}
+                    <Link to="/seller/profile" className="underline font-medium">profile</Link> to see buyers who match your expertise.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
+            {/* Recommended Buyer Leads */}
+            <Card className="border-0 shadow-lg mb-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Star className="w-5 h-5 text-indigo-600" />
+                    <CardTitle>Recommended Buyer Leads</CardTitle>
+                    {recommendedBuyers.length > 0 && (
+                      <Badge variant="secondary" className="bg-indigo-100 text-indigo-700">
+                        {recommendedBuyers.length} matches
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <CardDescription>
+                  {sellerOnboarding 
+                    ? "Buyers whose project needs align with your company's expertise"
+                    : "Set your preferences to see recommended buyers"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!sellerOnboarding ? (
+                  <div className="text-center py-8">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-slate-400 opacity-50" />
+                    <p className="text-slate-600 mb-2">No preferences set yet</p>
+                    <p className="text-sm text-slate-500 mb-4">
+                      Set your project types and specializations to see buyers that match your expertise
+                    </p>
+                    <Link to="/seller/profile">
+                      <Button variant="outline">
+                        <Edit className="w-4 h-4 mr-2" />
+                        Set Preferences
+                      </Button>
+                    </Link>
+                  </div>
+                ) : recommendedBuyers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-slate-400 opacity-50" />
+                    <p className="text-slate-600 mb-2">No matching buyers found</p>
+                    <p className="text-sm text-slate-500">
+                      We'll show buyers here as they sign up and match your preferences
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {(showAllRecommended ? recommendedBuyers : recommendedBuyers.slice(0, 6)).map((buyer) => {
+                      return (
+                        <Card key={buyer.email} className="border-indigo-200 bg-indigo-50/30 hover:shadow-md transition-all">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <CardTitle className="text-base mb-1">{buyer.name}</CardTitle>
+                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                  <Mail className="w-3.5 h-3.5" />
+                                  <span className="truncate">{buyer.email}</span>
+                                </div>
+                              </div>
+                              <Star className="w-5 h-5 text-indigo-600 fill-indigo-600" />
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            {buyer.onboarding && (
+                              <>
+                                {buyer.onboarding.buyerProjectTypes && buyer.onboarding.buyerProjectTypes.length > 0 && (
+                                  <div>
+                                    <p className="text-xs font-semibold text-slate-700 mb-1">Project Types</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {buyer.onboarding.buyerProjectTypes.slice(0, 2).map((type, idx) => (
+                                        <Badge key={idx} variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                                          {type.replace(/^.*? - /, '')}
+                                        </Badge>
+                                      ))}
+                                      {buyer.onboarding.buyerProjectTypes.length > 2 && (
+                                        <Badge variant="secondary" className="text-xs bg-slate-100 text-slate-600">
+                                          +{buyer.onboarding.buyerProjectTypes.length - 2}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                {buyer.onboarding.materialTypes && buyer.onboarding.materialTypes.length > 0 && (
+                                  <div>
+                                    <p className="text-xs font-semibold text-slate-700 mb-1">Material Interests</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {buyer.onboarding.materialTypes.slice(0, 2).map((type, idx) => (
+                                        <Badge key={idx} variant="outline" className="text-xs border-indigo-300 text-indigo-700">
+                                          {type.replace(/^Other: /, '')}
+                                        </Badge>
+                                      ))}
+                                      {buyer.onboarding.materialTypes.length > 2 && (
+                                        <Badge variant="outline" className="text-xs border-slate-300 text-slate-600">
+                                          +{buyer.onboarding.materialTypes.length - 2}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                {buyer.onboarding.budgetRange && (
+                                    <div className="pt-2 border-t border-indigo-200">
+                                    <p className="text-xs text-slate-600">
+                                      <span className="font-semibold">Budget:</span> {buyer.onboarding.budgetRange}
+                                    </p>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            <div className="pt-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full"
+                                onClick={() => {
+                                  setSelectedBuyer(buyer);
+                                  setMessageDialogOpen(true);
+                                }}
+                              >
+                                <MessageSquare className="w-4 h-4 mr-2" />
+                                Message Buyer
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                      })}
+                    </div>
+                    {recommendedBuyers.length > 6 && (
+                      <div className="mt-4 text-center">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowAllRecommended(!showAllRecommended)}
+                        >
+                          {showAllRecommended ? (
+                            <>
+                              Show Less
+                            </>
+                          ) : (
+                            <>
+                              See All Recommended ({recommendedBuyers.length} total)
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Revenue Chart */}
+            <Card className="border-0 shadow-lg mb-6">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-slate-600">Total Revenue</p>
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-3xl md:text-4xl font-display font-bold text-slate-900">
+                        ${loadingRevenue ? '...' : totalRevenue.toLocaleString()}
+                      </span>
+                      {(chartData.length > 1 || chartPeriod === 'YTD') && (
+                        <span className={`flex items-center text-sm font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                          <TrendingUp className={`w-4 h-4 mr-1 ${!isPositive && 'rotate-180'}`} />
+                          {revenueChangeDisplay}
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="ml-1.5 inline-flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                                <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 transition-colors" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[280px]">
+                              <p className="text-xs leading-relaxed">
+                                <span className="font-semibold">Percentage Change:</span> Compares total revenue in the selected period to the immediately preceding period of equal length.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {loadingRevenue ? 'Loading...' : `${revenueData?.totalBids || 0} accepted bids`}
+                    </p>
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {(['1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'] as const).map((period) => (
+                      <button
+                        key={period}
+                        onClick={() => setChartPeriod(period)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          chartPeriod === period 
+                            ? 'bg-indigo-600 text-white' 
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
+                      >
+                        {period}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="h-[200px] md:h-[280px] -mx-2">
+                  {loadingRevenue ? (
+                    <div className="h-full flex items-center justify-center text-slate-500">
+                      Loading revenue data...
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={chartData} margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
+                        <defs>
+                          <linearGradient id="revenueBarGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="hsl(38 92% 55%)" stopOpacity={1} />
+                            <stop offset="100%" stopColor="hsl(38 92% 45%)" stopOpacity={1} />
+                          </linearGradient>
+                          <filter id="barShadow">
+                            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="hsl(38 92% 50%)" floodOpacity="0.15" />
+                          </filter>
+                        </defs>
+                        <XAxis 
+                          dataKey="label" 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }}
+                          dy={10}
+                          angle={chartPeriod === '1D' ? -45 : 0}
+                          height={chartPeriod === '1D' ? 60 : 36}
+                          interval={chartPeriod === '1D' ? 6 : chartPeriod === '1W' ? 2 : chartPeriod === '1M' ? 5 : chartPeriod === '3M' ? 10 : chartPeriod === 'ALL' ? Math.floor(chartData.length / 6) : 'preserveStartEnd'}
+                        />
+                        <YAxis 
+                          hide
+                          yAxisId="revenue"
+                          domain={[0, 'dataMax + Math.max(1000, dataMax * 0.1)']}
+                        />
+                        <YAxis 
+                          hide
+                          yAxisId="cumulative"
+                          orientation="right"
+                          domain={[0, 'dataMax + Math.max(1000, dataMax * 0.1)']}
+                        />
+                        <RechartsTooltip
+                          contentStyle={{
+                            backgroundColor: 'white',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '10px',
+                            fontSize: '13px',
+                            padding: '12px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                          }}
+                          cursor={{ fill: 'rgba(251, 191, 36, 0.1)', stroke: '#f59e0b', strokeWidth: 1, strokeDasharray: '3 3' }}
+                          formatter={(value: number, name: string) => {
+                            if (name === 'revenue') {
+                              return [`$${value.toLocaleString()}`, 'Event Revenue'];
+                            } else if (name === 'cumulative') {
+                              return [`$${value.toLocaleString()}`, 'Cumulative'];
+                            }
+                            return [value, name];
+                          }}
+                          labelStyle={{ 
+                            color: '#1e293b', 
+                            fontWeight: 600, 
+                            marginBottom: '4px',
+                            fontSize: '12px'
+                          }}
+                          itemStyle={{ padding: '2px 0' }}
+                        />
+                        <Bar
+                          yAxisId="revenue"
+                          dataKey="revenue"
+                          fill="url(#revenueBarGradient)"
+                          radius={[4, 4, 0, 0]}
+                          opacity={0.95}
+                          filter="url(#barShadow)"
+                        />
+                        <Line
+                          yAxisId="cumulative"
+                          type="monotone"
+                          dataKey="cumulative"
+                          stroke="hsl(221 83% 53%)"
+                          strokeWidth={2}
+                          strokeOpacity={0.35}
+                          strokeDasharray="4 4"
+                          dot={false}
+                          activeDot={{ 
+                            r: 4, 
+                            fill: 'hsl(221 83% 53%)', 
+                            stroke: 'white', 
+                            strokeWidth: 2,
+                            opacity: 0.8
+                          }}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
               {[
                 { 
-                  label: "Listed Materials", 
+                  label: "Materials", 
                   value: stats.materialCount.toString(), 
                   icon: Package, 
-                  color: "accent",
+                  color: "amber",
                   link: "/seller/materials"
                 },
                 { 
                   label: "Total Stock", 
                   value: stats.totalStock.toLocaleString(), 
                   icon: Building2, 
-                  color: "primary" 
+                  color: "slate" 
                 },
                 { 
                   label: "Inventory Value", 
                   value: `$${stats.inventoryValue.toLocaleString()}`, 
                   icon: DollarSign, 
-                  color: "primary" 
+                  color: "slate" 
                 },
                 { 
                   label: "Pending Bids", 
                   value: stats.pendingBids.toString(), 
                   icon: Inbox, 
-                  color: "accent",
+                  color: "amber",
                   link: "/seller/bids"
                 },
+                { 
+                  label: "Matching Leads", 
+                  value: stats.recommendedLeads.toString(), 
+                  icon: Users, 
+                  color: "green",
+                  subtitle: `${stats.totalLeads} total buyers`
+                },
               ].map((stat, i) => (
-                <div key={i} className="p-4 rounded-xl bg-card border border-border">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground">{stat.label}</p>
-                      <p className="text-xl font-display font-bold text-foreground mt-1">{stat.value}</p>
+                <Card key={i} className="border-0 shadow-md">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-slate-600 mb-1">{stat.label}</p>
+                        <p className="text-xl font-bold text-slate-900">{stat.value}</p>
+                        {stat.subtitle && (
+                          <p className="text-xs text-slate-500 mt-1">{stat.subtitle}</p>
+                        )}
+                      </div>
+                      <div className={`w-10 h-10 rounded-lg ${
+                        stat.color === 'amber' ? 'bg-indigo-100' : 
+                        stat.color === 'green' ? 'bg-green-100' : 
+                        'bg-slate-100'
+                      } flex items-center justify-center`}>
+                        <stat.icon className={`w-5 h-5 ${
+                          stat.color === 'amber' ? 'text-indigo-600' : 
+                          stat.color === 'green' ? 'text-green-600' : 
+                          'text-slate-600'
+                        }`} />
+                      </div>
                     </div>
-                    <div className={`w-10 h-10 rounded-lg ${stat.color === 'accent' ? 'bg-accent' : 'gradient-hero'} flex items-center justify-center`}>
-                      <stat.icon className={`w-5 h-5 ${stat.color === 'accent' ? 'text-accent-foreground' : 'text-primary-foreground'}`} />
-                    </div>
-                  </div>
-                  {stat.link && (
-                    <Link to={stat.link} className="text-xs text-primary hover:underline mt-2 inline-block">
-                      View details →
-                    </Link>
-                  )}
-                </div>
+                    {stat.link && (
+                      <Link to={stat.link} className="text-xs text-indigo-600 hover:underline mt-2 inline-block">
+                        View →
+                      </Link>
+                    )}
+                  </CardContent>
+                </Card>
               ))}
             </div>
 
             {/* Two Column Layout */}
             <div className="grid lg:grid-cols-2 gap-6">
               {/* Recent Bids */}
-              <div className="rounded-xl bg-card border border-border overflow-hidden">
-                <div className="p-4 border-b border-border flex items-center justify-between">
-                  <h2 className="font-display font-semibold text-lg">Recent Bids</h2>
-                  <Link to="/seller/bids">
-                    <Button variant="ghost" size="sm">View All</Button>
-                  </Link>
-                </div>
-                {recentBids.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground">
-                    <Inbox className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                    <p>No bids received yet</p>
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="border-b border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Recent Bids</CardTitle>
+                    <Link to="/seller/bids">
+                      <Button variant="ghost" size="sm">View All</Button>
+                    </Link>
                   </div>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {recentBids.map((bid) => (
-                      <div key={bid.id} className="p-4 hover:bg-muted/30 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{bid.buyerName}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Bid #{bid.id} · {new Date(bid.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-foreground">${bid.totalAmount.toFixed(2)}</p>
-                            <span
-                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadge(bid.status)}`}
-                            >
-                              {getStatusLabel(bid.status)}
-                            </span>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {recentBids.length === 0 ? (
+                    <div className="p-8 text-center text-slate-500">
+                      <Inbox className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                      <p>No bids received yet</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-200">
+                      {recentBids.map((bid) => (
+                        <div key={bid.id} className="p-4 hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-slate-900">{bid.buyerName}</p>
+                              <p className="text-sm text-slate-500">
+                                Bid #{bid.id} · {new Date(bid.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-slate-900">${bid.totalAmount.toFixed(2)}</p>
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadge(bid.status)}`}
+                              >
+                                {getStatusLabel(bid.status)}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Company Info */}
-              <div className="rounded-xl bg-card border border-border overflow-hidden">
-                <div className="p-4 border-b border-border">
-                  <h2 className="font-display font-semibold text-lg">Company Profile</h2>
-                </div>
-                {company && (
-                  <div className="p-6 space-y-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Company Name</p>
-                      <p className="font-medium text-lg">{company.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Description</p>
-                      <p className="text-foreground">{company.description}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="border-b border-slate-200">
+                  <CardTitle className="text-lg">Company Profile</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {company ? (
+                    <div className="space-y-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Location</p>
-                        <p className="font-medium">{company.location}</p>
+                        <p className="text-sm text-slate-600">Company Name</p>
+                        <p className="font-medium text-lg text-slate-900">{company.name}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Phone</p>
-                        <p className="font-medium">{company.phone}</p>
+                        <p className="text-sm text-slate-600">Description</p>
+                        <p className="text-slate-900">{company.description}</p>
                       </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-slate-600">Location</p>
+                          <p className="font-medium text-slate-900">{company.location}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600">Phone</p>
+                          <p className="font-medium text-slate-900">{company.phone}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600">Email</p>
+                        <p className="font-medium text-slate-900">{company.email}</p>
+                      </div>
+                      <Button variant="outline" className="w-full mt-4" onClick={handleEditProfile}>
+                        <Settings className="w-4 h-4 mr-2" />
+                        Edit Profile
+                      </Button>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Email</p>
-                      <p className="font-medium">{company.email}</p>
-                    </div>
-                    <Button variant="outline" className="w-full mt-4" onClick={handleEditProfile}>
-                      <Settings className="w-4 h-4 mr-2" />
-                      Edit Profile
-                    </Button>
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <p className="text-slate-500">No company information available</p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </>
         )}
@@ -626,6 +1164,95 @@ const SellerDashboard = () => {
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Message Buyer Dialog */}
+      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send Message to {selectedBuyer?.name}</DialogTitle>
+            <DialogDescription>
+              Start a conversation with this buyer. They'll see your message in their inbox.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBuyer && (
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm font-semibold text-foreground mb-1">{selectedBuyer.name}</p>
+                <p className="text-xs text-muted-foreground">{selectedBuyer.email}</p>
+                {selectedBuyer.onboarding?.buyerProjectTypes && selectedBuyer.onboarding.buyerProjectTypes.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-muted-foreground mb-1">Project Types:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedBuyer.onboarding.buyerProjectTypes.slice(0, 3).map((type, idx) => (
+                        <Badge key={idx} variant="secondary" className="text-xs">
+                          {type.replace(/^.*? - /, '')}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="message">Message</Label>
+                <Textarea
+                  id="message"
+                  placeholder="Hi, I noticed your project needs align with our expertise. I'd love to discuss how we can help with your material requirements..."
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  className="mt-2 min-h-[120px]"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setMessageDialogOpen(false);
+                    setMessageText("");
+                    setSelectedBuyer(null);
+                  }}
+                  disabled={sendingMessage}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!messageText.trim() || !sellerEmail || !company || !selectedBuyer) return;
+                    setSendingMessage(true);
+                    try {
+                      await sendMessage({
+                        senderEmail: sellerEmail,
+                        senderName: company.name,
+                        senderRole: "seller",
+                        recipientEmail: selectedBuyer.email,
+                        recipientName: selectedBuyer.name,
+                        recipientRole: "buyer",
+                        content: messageText.trim(),
+                      });
+                      setMessageDialogOpen(false);
+                      setMessageText("");
+                      setSelectedBuyer(null);
+                      alert("Message sent successfully! The buyer will see it in their inbox.");
+                    } catch (error) {
+                      console.error("Failed to send message:", error);
+                      alert("Failed to send message. Please try again.");
+                    } finally {
+                      setSendingMessage(false);
+                    }
+                  }}
+                  disabled={!messageText.trim() || sendingMessage}
+                >
+                  {sendingMessage ? 'Sending...' : (
+                    <>
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Send Message
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

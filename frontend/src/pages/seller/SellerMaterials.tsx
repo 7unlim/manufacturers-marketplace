@@ -40,8 +40,6 @@ import { fetchCompanies, fetchMaterials, createMaterial, type Company, type Mate
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const SELLER_COMPANY_ID = 1;
-
 type ParsedMaterial = {
   name: string;
   type: string;
@@ -82,20 +80,52 @@ const SellerMaterials = () => {
     leadTimeDays: "",
   });
   const [isCreating, setIsCreating] = useState(false);
+  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [accountName, setAccountName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Load seller account info to get companyId
+    const authAccount = localStorage.getItem("authAccount");
+    let sellerCompanyId: number | null = null;
+    
+    if (authAccount) {
+      try {
+        const account = JSON.parse(authAccount);
+        if (account.companyId) {
+          sellerCompanyId = account.companyId;
+          setCompanyId(sellerCompanyId);
+        }
+        if (account.name) {
+          setAccountName(account.name);
+        }
+        if (account.company) {
+          setCompany(account.company);
+        }
+      } catch (error) {
+        console.error("Error parsing auth account:", error);
+      }
+    }
+
     const loadData = async () => {
+      if (!sellerCompanyId) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const [companiesData, materialsData] = await Promise.all([
           fetchCompanies(),
-          fetchMaterials({ companyId: SELLER_COMPANY_ID })
+          fetchMaterials({ companyId: sellerCompanyId })
         ]);
         
-        const myCompany = companiesData.find(c => c.id === SELLER_COMPANY_ID);
-        setCompany(myCompany || null);
-        setMaterials(materialsData.filter(m => m.companyId === SELLER_COMPANY_ID));
+        setCompany(prevCompany => {
+          if (prevCompany) return prevCompany;
+          const myCompany = companiesData.find(c => c.id === sellerCompanyId);
+          return myCompany || null;
+        });
+        setMaterials(materialsData.filter(m => m.companyId === sellerCompanyId));
       } catch (error) {
         console.error("Failed to load data:", error);
       } finally {
@@ -165,8 +195,18 @@ const SellerMaterials = () => {
 
     setIsCreating(true);
     try {
+      if (!companyId) {
+        toast({
+          title: "Error",
+          description: "Company ID not found. Please sign in again.",
+          variant: "destructive",
+        });
+        setIsCreating(false);
+        return;
+      }
+
       const response = await createMaterial({
-        companyId: SELLER_COMPANY_ID,
+        companyId: companyId,
         code: newMaterial.code.trim() || undefined,
         name,
         type,
@@ -178,8 +218,8 @@ const SellerMaterials = () => {
       });
 
       // Refresh materials list
-      const materialsData = await fetchMaterials({ companyId: SELLER_COMPANY_ID });
-      setMaterials(materialsData.filter(m => m.companyId === SELLER_COMPANY_ID));
+      const materialsData = await fetchMaterials({ companyId: companyId });
+      setMaterials(materialsData.filter(m => m.companyId === companyId));
 
       // Reset form and close dialog
       setNewMaterial({
@@ -297,6 +337,15 @@ const SellerMaterials = () => {
   };
 
   const confirmImport = async () => {
+    if (!companyId) {
+      toast({
+        title: "Error",
+        description: "Company ID not found. Please sign in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setImportResult(prev => ({ ...prev, status: 'importing', message: 'Importing materials...' }));
     
     // Simulate import delay
@@ -305,7 +354,7 @@ const SellerMaterials = () => {
     // Add to local materials (in real implementation, would call backend API)
     const newMaterials: Material[] = importResult.parsedData.map((item, idx) => ({
       id: materials.length + idx + 100,
-      companyId: SELLER_COMPANY_ID,
+      companyId: companyId,
       name: item.name,
       type: item.type,
       description: item.description,
@@ -375,7 +424,7 @@ const SellerMaterials = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-3 px-3">
-                <span className="text-sm font-medium">{company?.name || "Seller"}</span>
+                <span className="text-sm font-medium">{company?.name || accountName || "Seller Account"}</span>
                 <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center">
                   <User className="w-5 h-5 text-accent-foreground" />
                 </div>

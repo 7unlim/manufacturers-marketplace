@@ -1,8 +1,17 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Link } from "react-router-dom";
-import { Search, Package, Building2, ChevronDown, LogOut, Settings, User, MapPin, Phone, Mail, Sparkles, ShoppingCart, Star, Award, Shield, FileText } from "lucide-react";
+import { Search, Package, Building2, ChevronDown, LogOut, Settings, User, MapPin, Phone, Mail, Sparkles, ShoppingCart, Star, Award, Shield, FileText, MessageSquare, Home } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +28,12 @@ const BuyerCompanies = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
+  const [buyerName, setBuyerName] = useState<string>("Buyer Account");
+  const [buyerEmail, setBuyerEmail] = useState<string>("");
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [messageText, setMessageText] = useState("");
+  const [sending, setSending] = useState(false);
   const [favorites, setFavorites] = useState<number[]>(() => {
     try {
       const stored = localStorage.getItem(FAVORITES_KEY);
@@ -29,6 +44,22 @@ const BuyerCompanies = () => {
   });
 
   useEffect(() => {
+    // Load buyer account info
+    const authAccount = localStorage.getItem("authAccount");
+    if (authAccount) {
+      try {
+        const account = JSON.parse(authAccount);
+        if (account.name) {
+          setBuyerName(account.name);
+        }
+        if (account.email) {
+          setBuyerEmail(account.email);
+        }
+      } catch (error) {
+        console.error("Error parsing auth account:", error);
+      }
+    }
+
     const loadData = async () => {
       try {
         const [companiesData, materialsData] = await Promise.all([
@@ -101,17 +132,24 @@ const BuyerCompanies = () => {
             </Link>
 
             <div className="hidden md:flex items-center gap-1">
-              <Button variant="ghost" className="text-primary font-medium">
-                <Building2 className="w-4 h-4 mr-2" />
-                Companies
-              </Button>
-              <span className="text-border">|</span>
               <Link to="/buyer/home">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <Home className="w-4 h-4 mr-2" />
+                  Home
+                </Button>
+              </Link>
+              <span className="text-border">|</span>
+              <Link to="/buyer/materials">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <Package className="w-4 h-4 mr-2" />
                   Materials
                 </Button>
               </Link>
+              <span className="text-border">|</span>
+              <Button variant="ghost" className="text-primary font-medium">
+                <Building2 className="w-4 h-4 mr-2" />
+                Companies
+              </Button>
               <span className="text-border">|</span>
               <Link to="/buyer/bids">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
@@ -132,7 +170,7 @@ const BuyerCompanies = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-3 px-3">
-                <span className="text-sm font-medium">Buyer Account</span>
+                <span className="text-sm font-medium">{buyerName}</span>
                 <div className="w-9 h-9 rounded-full gradient-hero flex items-center justify-center">
                   <User className="w-5 h-5 text-primary-foreground" />
                 </div>
@@ -274,11 +312,22 @@ const BuyerCompanies = () => {
                 )}
 
                 <div className="flex gap-2">
-                  <Link to={`/buyer/home?companyId=${company.id}`} className="flex-1">
+                  <Link to={`/buyer/materials?companyId=${company.id}`} className="flex-1">
                     <Button variant="outline" className="w-full">
                       View Materials
                     </Button>
                   </Link>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => {
+                      setSelectedCompany(company);
+                      setMessageDialogOpen(true);
+                    }}
+                  >
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Message
+                  </Button>
                   <Link to={`/buyer/bids?companyId=${company.id}`} className="flex-1">
                     <Button className="w-full gradient-hero text-primary-foreground">
                       Start Bid
@@ -301,6 +350,79 @@ const BuyerCompanies = () => {
           )}
         </div>
       </main>
+
+      {/* Message Dialog */}
+      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send Message to {selectedCompany?.name}</DialogTitle>
+            <DialogDescription>
+              Start a conversation with this seller
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCompany && (
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="text-sm font-semibold text-slate-900 mb-1">{selectedCompany.name}</p>
+                <p className="text-xs text-slate-600">{selectedCompany.email}</p>
+                <p className="text-xs text-slate-500 mt-1">{selectedCompany.location}</p>
+              </div>
+              <div>
+                <Label htmlFor="message">Message</Label>
+                <Textarea
+                  id="message"
+                  placeholder="Hi, I'm interested in learning more about your materials..."
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  className="mt-2 min-h-[120px]"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setMessageDialogOpen(false);
+                    setMessageText("");
+                    setSelectedCompany(null);
+                  }}
+                  disabled={sending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!messageText.trim() || !buyerEmail || !buyerName || !selectedCompany) return;
+                    setSending(true);
+                    try {
+                      await sendMessage({
+                        senderEmail: buyerEmail,
+                        senderName: buyerName,
+                        senderRole: "buyer",
+                        recipientEmail: selectedCompany.email,
+                        recipientName: selectedCompany.name,
+                        recipientRole: "seller",
+                        content: messageText.trim(),
+                      });
+                      setMessageDialogOpen(false);
+                      setMessageText("");
+                      setSelectedCompany(null);
+                      alert("Message sent successfully!");
+                    } catch (error) {
+                      console.error("Failed to send message:", error);
+                      alert("Failed to send message. Please try again.");
+                    } finally {
+                      setSending(false);
+                    }
+                  }}
+                  disabled={!messageText.trim() || sending}
+                >
+                  {sending ? 'Sending...' : 'Send Message'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

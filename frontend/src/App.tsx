@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 
 // Buyer Pages
 import BuyerHome from "./pages/buyer/BuyerHome";
+import BuyerMaterials from "./pages/buyer/BuyerMaterials";
 import BuyerCompanies from "./pages/buyer/BuyerCompanies";
 import BuyerBids from "./pages/buyer/BuyerBids";
 import BuyerBidsHistory from "./pages/buyer/BuyerBidsHistory";
@@ -39,6 +40,7 @@ const App = () => (
           
           {/* Buyer Routes */}
           <Route path="/buyer/home" element={<BuyerHome />} />
+          <Route path="/buyer/materials" element={<BuyerMaterials />} />
           <Route path="/buyer/companies" element={<BuyerCompanies />} />
           <Route path="/buyer/bids" element={<BuyerBids />} />
           <Route path="/buyer/bids/history" element={<BuyerBidsHistory />} />

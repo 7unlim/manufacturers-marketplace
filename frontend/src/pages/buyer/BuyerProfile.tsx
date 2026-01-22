@@ -11,20 +11,46 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, User, Settings, LogOut, ChevronDown, Save } from "lucide-react";
+import { ArrowLeft, User, Settings, LogOut, ChevronDown, Save, Edit, Info } from "lucide-react";
+import BuyerOnboarding, { type BuyerOnboardingData } from "@/components/BuyerOnboarding";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { updatePreferences } from "@/lib/api";
 
 const BuyerProfile = () => {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingOnboarding, setIsEditingOnboarding] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
   });
+  const [onboardingData, setOnboardingData] = useState<BuyerOnboardingData | null>(null);
+  const [buyerName, setBuyerName] = useState<string>("Buyer Account");
 
   // Load buyer info from localStorage or use defaults
   useEffect(() => {
-    const savedName = localStorage.getItem("buyerName") || "Buyer Account";
+    // Load account name from authAccount first
+    const authAccount = localStorage.getItem("authAccount");
+    let accountName = "Buyer Account";
+    
+    if (authAccount) {
+      try {
+        const account = JSON.parse(authAccount);
+        if (account.name) {
+          accountName = account.name;
+          setBuyerName(account.name);
+        }
+        if (account.onboarding) {
+          setOnboardingData(account.onboarding);
+        }
+      } catch (error) {
+        console.error("Error parsing auth account:", error);
+      }
+    }
+
+    const savedName = localStorage.getItem("buyerName") || accountName;
     const savedEmail = localStorage.getItem("buyerEmail") || "";
     const savedPhone = localStorage.getItem("buyerPhone") || "";
     
@@ -41,6 +67,41 @@ const BuyerProfile = () => {
     localStorage.setItem("buyerPhone", formData.phone);
     setIsEditing(false);
     alert("Profile updated successfully!");
+  };
+
+  const handleOnboardingSave = async (data: BuyerOnboardingData) => {
+    const authAccount = localStorage.getItem("authAccount");
+    if (!authAccount) {
+      alert("Please sign in again.");
+      return;
+    }
+
+    try {
+      const account = JSON.parse(authAccount);
+      if (!account.email) {
+        alert("Email not found. Please sign in again.");
+        return;
+      }
+
+      // Update backend
+      const response = await updatePreferences({
+        email: account.email,
+        onboarding: data,
+      });
+
+      // Update localStorage with the response from backend
+      const updatedAccount = {
+        ...account,
+        onboarding: response.account.onboarding,
+      };
+      localStorage.setItem("authAccount", JSON.stringify(updatedAccount));
+      setOnboardingData(data);
+      setIsEditingOnboarding(false);
+      alert("Preferences updated successfully!");
+    } catch (error) {
+      console.error("Error updating onboarding:", error);
+      alert("Failed to update preferences. Please try again.");
+    }
   };
 
   return (
@@ -60,7 +121,7 @@ const BuyerProfile = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-3 px-3">
-                <span className="text-sm font-medium">Buyer Account</span>
+                <span className="text-sm font-medium">{buyerName}</span>
                 <div className="w-9 h-9 rounded-full gradient-hero flex items-center justify-center">
                   <User className="w-5 h-5 text-primary-foreground" />
                 </div>
@@ -174,6 +235,97 @@ const BuyerProfile = () => {
                 </Button>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Onboarding Preferences */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Material & Project Preferences</span>
+              {!isEditingOnboarding && (
+                <Button variant="outline" size="sm" onClick={() => setIsEditingOnboarding(true)}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Preferences
+                </Button>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Update your material preferences and project types to get better recommendations
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isEditingOnboarding ? (
+              <div className="space-y-4">
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    You can always come back to update these preferences later. This helps us match you with the right suppliers and materials.
+                  </AlertDescription>
+                </Alert>
+                <BuyerOnboarding
+                  onComplete={handleOnboardingSave}
+                  onSkip={() => setIsEditingOnboarding(false)}
+                  initialData={onboardingData || undefined}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {onboardingData ? (
+                  <>
+                    {onboardingData.materialTypes && onboardingData.materialTypes.length > 0 && (
+                      <div>
+                        <Label className="text-sm font-semibold mb-2 block">Material Types</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {onboardingData.materialTypes.map((type, idx) => (
+                            <Badge key={idx} variant="secondary">{type}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {onboardingData.buyerProjectTypes && onboardingData.buyerProjectTypes.length > 0 && (
+                      <div>
+                        <Label className="text-sm font-semibold mb-2 block">Project Types</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {onboardingData.buyerProjectTypes.map((type, idx) => (
+                            <Badge key={idx} variant="secondary">{type}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {onboardingData.projectScale && onboardingData.projectScale.length > 0 && (
+                      <div>
+                        <Label className="text-sm font-semibold mb-2 block">Project Scale</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {onboardingData.projectScale.map((scale, idx) => (
+                            <Badge key={idx} variant="secondary">{scale}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {onboardingData.budgetRange && (
+                      <div>
+                        <Label className="text-sm font-semibold mb-2 block">Budget Range</Label>
+                        <Badge variant="outline">{onboardingData.budgetRange}</Badge>
+                      </div>
+                    )}
+                    {onboardingData.urgencyLevel && (
+                      <div>
+                        <Label className="text-sm font-semibold mb-2 block">Urgency Level</Label>
+                        <Badge variant="outline">{onboardingData.urgencyLevel}</Badge>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-slate-500">
+                    <p className="mb-2">No preferences set yet</p>
+                    <Button variant="outline" onClick={() => setIsEditingOnboarding(true)}>
+                      Set Your Preferences
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>

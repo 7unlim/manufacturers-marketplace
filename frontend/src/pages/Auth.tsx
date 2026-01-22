@@ -8,11 +8,16 @@ import { Link, useNavigate } from "react-router-dom";
 import { Package, ShoppingCart, Factory, ArrowRight, Loader2, Mail, Lock, User, Sparkles, CheckCircle2 } from "lucide-react";
 import { signUp, signIn, type AuthAccount } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import SellerOnboarding, { type OnboardingData } from "@/components/SellerOnboarding";
+import BuyerOnboarding, { type BuyerOnboardingData } from "@/components/BuyerOnboarding";
 
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingType, setOnboardingType] = useState<"seller" | "buyer" | null>(null);
+  const [pendingAccount, setPendingAccount] = useState<AuthAccount | null>(null);
   const [signInData, setSignInData] = useState({ email: "", password: "" });
   const [signUpData, setSignUpData] = useState({
     email: "",
@@ -105,16 +110,14 @@ const Auth = () => {
       localStorage.setItem("authAccount", JSON.stringify(response.account));
       localStorage.setItem("isAuthenticated", "true");
 
-      toast({
-        title: "Account created successfully",
-        description: `Welcome, ${response.account.name}!`,
-      });
-
-      // Redirect based on role
-      if (response.account.role === "buyer") {
-        navigate("/buyer/home");
+      // Show onboarding based on role
+      setPendingAccount(response.account);
+      if (response.account.role === "seller") {
+        setOnboardingType("seller");
+        setShowOnboarding(true);
       } else {
-        navigate("/seller/dashboard");
+        setOnboardingType("buyer");
+        setShowOnboarding(true);
       }
     } catch (error: any) {
       toast({
@@ -126,6 +129,92 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  const handleSellerOnboardingComplete = async (onboardingData: OnboardingData) => {
+    if (!pendingAccount) return;
+
+    try {
+      // Save onboarding data to localStorage
+      const accountWithOnboarding = {
+        ...pendingAccount,
+        onboarding: onboardingData
+      };
+      localStorage.setItem("authAccount", JSON.stringify(accountWithOnboarding));
+
+      toast({
+        title: "Account created successfully",
+        description: `Welcome, ${pendingAccount.name}!`,
+      });
+
+      navigate("/seller/dashboard");
+    } catch (error) {
+      console.error("Error saving onboarding data:", error);
+      const accountWithOnboarding = {
+        ...pendingAccount,
+        onboarding: onboardingData
+      };
+      localStorage.setItem("authAccount", JSON.stringify(accountWithOnboarding));
+      navigate("/seller/dashboard");
+    }
+  };
+
+  const handleBuyerOnboardingComplete = async (onboardingData: BuyerOnboardingData) => {
+    if (!pendingAccount) return;
+
+    try {
+      // Save onboarding data to localStorage
+      const accountWithOnboarding = {
+        ...pendingAccount,
+        onboarding: onboardingData
+      };
+      localStorage.setItem("authAccount", JSON.stringify(accountWithOnboarding));
+
+      toast({
+        title: "Account created successfully",
+        description: `Welcome, ${pendingAccount.name}! We'll help you find the perfect materials.`,
+      });
+
+      navigate("/buyer/home");
+    } catch (error) {
+      console.error("Error saving onboarding data:", error);
+      const accountWithOnboarding = {
+        ...pendingAccount,
+        onboarding: onboardingData
+      };
+      localStorage.setItem("authAccount", JSON.stringify(accountWithOnboarding));
+      navigate("/buyer/home");
+    }
+  };
+
+  const handleSkipOnboarding = () => {
+    if (pendingAccount) {
+      const role = pendingAccount.role;
+      toast({
+        title: "Account created successfully",
+        description: `Welcome, ${pendingAccount.name}! You can complete your profile later.`,
+      });
+      navigate(role === "seller" ? "/seller/dashboard" : "/buyer/home");
+    }
+  };
+
+  // Show onboarding if user just signed up
+  if (showOnboarding && pendingAccount && onboardingType === "seller") {
+    return (
+      <SellerOnboarding
+        onComplete={handleSellerOnboardingComplete}
+        onSkip={handleSkipOnboarding}
+      />
+    );
+  }
+
+  if (showOnboarding && pendingAccount && onboardingType === "buyer") {
+    return (
+      <BuyerOnboarding
+        onComplete={handleBuyerOnboardingComplete}
+        onSkip={handleSkipOnboarding}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col relative overflow-hidden">

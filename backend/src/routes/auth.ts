@@ -13,6 +13,18 @@ interface Account {
   role: 'buyer' | 'seller';
   name: string;
   companyId?: number; // For sellers, link to company
+  onboarding?: {
+    // Seller onboarding fields
+    projectTypes?: string[]; // Seller project types
+    role?: string[]; // Seller role/specialization
+    specialCategories?: string[]; // Seller special categories
+    // Buyer onboarding fields
+    materialTypes?: string[]; // Buyer material preferences
+    buyerProjectTypes?: string[]; // Buyer project types (renamed to avoid conflict)
+    projectScale?: string[]; // Buyer project scale
+    budgetRange?: string; // Buyer budget range
+    urgencyLevel?: string; // Buyer urgency level
+  };
 }
 
 // Initialize accounts file with seller accounts from companies
@@ -76,7 +88,7 @@ initializeAccounts();
 // Sign up endpoint
 router.post('/signup', (req, res) => {
   try {
-    const { email, password, name, role, companyId } = req.body;
+    const { email, password, name, role, companyId, onboarding } = req.body;
 
     if (!email || !password || !name || !role) {
       return res.status(400).json({ error: 'Email, password, name, and role are required' });
@@ -100,6 +112,7 @@ router.post('/signup', (req, res) => {
       role,
       name,
       companyId: role === 'seller' ? companyId : undefined,
+      onboarding: req.body.onboarding || undefined,
     };
 
     accounts.push(newAccount);
@@ -112,6 +125,7 @@ router.post('/signup', (req, res) => {
         name: newAccount.name,
         role: newAccount.role,
         companyId: newAccount.companyId,
+        onboarding: newAccount.onboarding,
       },
     });
   } catch (error) {
@@ -138,6 +152,29 @@ router.post('/signin', (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    // Try to load preferences from database first, fallback to account file
+    let onboarding = account.onboarding;
+    try {
+      const prefRow = db
+        .prepare('SELECT onboarding FROM account_preferences WHERE email = ?')
+        .get(email.toLowerCase()) as { onboarding: string } | undefined;
+      
+      if (prefRow && prefRow.onboarding) {
+        onboarding = JSON.parse(prefRow.onboarding);
+        // Update accounts.txt with database preferences
+        const accountIndex = accounts.findIndex(
+          (acc) => acc.email.toLowerCase() === email.toLowerCase()
+        );
+        if (accountIndex !== -1) {
+          accounts[accountIndex].onboarding = onboarding;
+          saveAccounts(accounts);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading preferences from database:', error);
+      // Fallback to account file preferences
+    }
+
     // Get company info if seller
     let company = null;
     if (account.role === 'seller' && account.companyId) {
@@ -157,6 +194,7 @@ router.post('/signin', (req, res) => {
         role: account.role,
         companyId: account.companyId,
         company,
+        onboarding,
       },
     });
   } catch (error) {
@@ -175,6 +213,106 @@ router.get('/accounts', (req, res) => {
   } catch (error) {
     console.error('Error getting accounts:', error);
     res.status(500).json({ error: 'Failed to get accounts' });
+  }
+});
+
+// Get buyer leads (for sellers to see potential buyers)
+router.get('/buyer-leads', (req, res) => {
+  try {
+    const accounts = loadAccounts();
+    console.log(`[Buyer Leads API] Total accounts loaded: ${accounts.length}`);
+    
+    // Filter to only buyers and don't return passwords
+    const buyerLeads = accounts
+      .filter(acc => acc.role === 'buyer')
+      .map(({ password, ...rest }) => rest);
+    
+    console.log(`[Buyer Leads API] Buyer accounts found: ${buyerLeads.length}`);
+    
+    // Log onboarding data presence
+    const buyersWithOnboarding = buyerLeads.filter(lead => lead.onboarding);
+    const buyersWithoutOnboarding = buyerLeads.length - buyersWithOnboarding.length;
+    console.log(`[Buyer Leads API] Buyers with onboarding: ${buyersWithOnboarding.length}, without: ${buyersWithoutOnboarding}`);
+    
+    // Log sample buyer emails for debugging
+    if (buyerLeads.length > 0) {
+      console.log(`[Buyer Leads API] Sample buyer emails: ${buyerLeads.slice(0, 3).map(b => b.email).join(', ')}`);
+    } else {
+      console.log(`[Buyer Leads API] WARNING: No buyer accounts found! Check accounts.txt for accounts with role: 'buyer'`);
+    }
+    
+    res.json(buyerLeads);
+  } catch (error) {
+    console.error('[Buyer Leads API] Error getting buyer leads:', error);
+    res.status(500).json({ error: 'Failed to get buyer leads' });
+  }
+});
+
+// Update account preferences (onboarding data)
+router.put('/preferences', (req, res) => {
+  try {
+    const { email, onboarding } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    if (!onboarding) {
+      return res.status(400).json({ error: 'Onboarding data is required' });
+    }
+
+    const accounts = loadAccounts();
+    const accountIndex = accounts.findIndex(
+      (acc) => acc.email.toLowerCase() === email.toLowerCase()
+    );
+
+    if (accountIndex === -1) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    // Update the account's onboarding data in accounts.txt
+    accounts[accountIndex].onboarding = onboarding;
+    saveAccounts(accounts);
+
+    // Also save to database for persistence
+    const onboardingJson = JSON.stringify(onboarding);
+    const now = new Date().toISOString();
+    
+    const insertOrUpdate = db.prepare(`
+      INSERT INTO account_preferences (email, onboarding, updatedAt)
+      VALUES (?, ?, ?)
+      ON CONFLICT(email) DO UPDATE SET
+        onboarding = excluded.onboarding,
+        updatedAt = excluded.updatedAt
+    `);
+    
+    insertOrUpdate.run(email.toLowerCase(), onboardingJson, now);
+
+    // Get company info if seller
+    let company = null;
+    if (accounts[accountIndex].role === 'seller' && accounts[accountIndex].companyId) {
+      const companyData = db
+        .prepare('SELECT * FROM companies WHERE id = ?')
+        .get(accounts[accountIndex].companyId) as any;
+      if (companyData) {
+        company = companyData;
+      }
+    }
+
+    res.json({
+      message: 'Preferences updated successfully',
+      account: {
+        email: accounts[accountIndex].email,
+        name: accounts[accountIndex].name,
+        role: accounts[accountIndex].role,
+        companyId: accounts[accountIndex].companyId,
+        company,
+        onboarding: accounts[accountIndex].onboarding,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating preferences:', error);
+    res.status(500).json({ error: 'Failed to update preferences' });
   }
 });
 

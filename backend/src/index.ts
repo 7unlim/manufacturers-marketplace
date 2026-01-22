@@ -10,6 +10,7 @@ import bidsRouter from './routes/bids';
 import aiRouter from './routes/ai';
 import statsRouter from './routes/stats';
 import authRouter from './routes/auth';
+import messagesRouter from './routes/messages';
 import './db';
 
 const app = express();
@@ -27,6 +28,7 @@ app.use('/api/bids', bidsRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/messages', messagesRouter);
 
 const port = Number(process.env.PORT || 4000);
 app.listen(port, () => {

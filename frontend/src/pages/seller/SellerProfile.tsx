@@ -12,10 +12,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, User, Settings, LogOut, ChevronDown, Save, Building2 } from "lucide-react";
-import { fetchCompany, updateCompany, type Company } from "@/lib/api";
-
-const SELLER_COMPANY_ID = 1;
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ArrowLeft, User, Settings, LogOut, ChevronDown, Save, Building2, Edit, Info, Factory, Package, Inbox } from "lucide-react";
+import { fetchCompany, updateCompany, updatePreferences, type Company } from "@/lib/api";
+import SellerOnboarding, { type OnboardingData } from "@/components/SellerOnboarding";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 const SellerProfile = () => {
   const navigate = useNavigate();
@@ -31,11 +39,44 @@ const SellerProfile = () => {
     certifications: "",
   });
   const [saving, setSaving] = useState(false);
+  const [isEditingOnboarding, setIsEditingOnboarding] = useState(false);
+  const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
+  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [sellerName, setSellerName] = useState<string>("");
 
   useEffect(() => {
-    const loadCompany = async () => {
+    // Load seller account info to get companyId
+    const authAccountStr = localStorage.getItem("authAccount");
+    let sellerCompanyId: number | null = null;
+    
+    if (authAccountStr) {
       try {
-        const companyData = await fetchCompany(SELLER_COMPANY_ID);
+        const account = JSON.parse(authAccountStr);
+        if (account.companyId) {
+          sellerCompanyId = account.companyId;
+          setCompanyId(sellerCompanyId);
+        }
+        if (account.name) {
+          setSellerName(account.name);
+        }
+        if (account.company) {
+          setCompany(account.company);
+        }
+        if (account.onboarding) {
+          setOnboardingData(account.onboarding);
+        }
+      } catch (error) {
+        console.error("Error parsing auth account:", error);
+      }
+    }
+
+    const loadCompany = async () => {
+      if (!sellerCompanyId) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const companyData = await fetchCompany(sellerCompanyId);
         setCompany(companyData);
         setFormData({
           name: companyData.name || "",
@@ -52,12 +93,17 @@ const SellerProfile = () => {
       }
     };
     loadCompany();
+
   }, []);
 
   const handleSave = async () => {
+    if (!companyId) {
+      alert("Company ID not found. Please sign in again.");
+      return;
+    }
     setSaving(true);
     try {
-      const updated = await updateCompany(SELLER_COMPANY_ID, formData);
+      const updated = await updateCompany(companyId, formData);
       setCompany(updated);
       setIsEditing(false);
       alert("Company profile updated successfully!");
@@ -66,6 +112,42 @@ const SellerProfile = () => {
       alert("Failed to update profile. Please try again.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleOnboardingSave = async (data: OnboardingData) => {
+    const authAccountStr = localStorage.getItem("authAccount");
+    if (!authAccountStr) {
+      alert("Please sign in again.");
+      return;
+    }
+
+    try {
+      const account = JSON.parse(authAccountStr);
+      if (!account.email) {
+        alert("Email not found. Please sign in again.");
+        return;
+      }
+
+      // Update backend
+      const response = await updatePreferences({
+        email: account.email,
+        onboarding: data,
+      });
+
+      // Update localStorage with the response from backend
+      const updatedAccount = {
+        ...account,
+        onboarding: response.account.onboarding,
+        company: response.account.company, // Update company info if it changed
+      };
+      localStorage.setItem("authAccount", JSON.stringify(updatedAccount));
+      setOnboardingData(data);
+      setIsEditingOnboarding(false);
+      alert("Preferences updated successfully!");
+    } catch (error) {
+      console.error("Error updating onboarding:", error);
+      alert("Failed to update preferences. Please try again.");
     }
   };
 
@@ -80,21 +162,45 @@ const SellerProfile = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Navigation */}
-      <nav className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link to="/seller/dashboard" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg gradient-hero flex items-center justify-center">
-                <span className="text-white font-bold text-sm">M</span>
+      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
+        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link to="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
+                <Factory className="w-5 h-5 text-accent-foreground" />
               </div>
-              <span className="font-display font-semibold text-lg">Waypoint</span>
+              <span className="font-display font-bold text-xl text-foreground">Waypoint</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium">Seller</span>
             </Link>
+
+            <div className="hidden md:flex items-center gap-1">
+              <Link to="/seller/dashboard">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+              <span className="text-border">|</span>
+              <Link to="/seller/materials">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <Package className="w-4 h-4 mr-2" />
+                  Materials
+                </Button>
+              </Link>
+              <span className="text-border">|</span>
+              <Link to="/seller/bids">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <Inbox className="w-4 h-4 mr-2" />
+                  Bid Inbox
+                </Button>
+              </Link>
+            </div>
           </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-3 px-3">
-                <span className="text-sm font-medium">{company?.name || "Seller"}</span>
+                <span className="text-sm font-medium">{company?.name || sellerName || "Seller Account"}</span>
                 <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center">
                   <User className="w-5 h-5 text-accent-foreground" />
                 </div>
@@ -255,7 +361,88 @@ const SellerProfile = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Onboarding Preferences */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Company Specializations & Project Types</span>
+              {!isEditingOnboarding && (
+                <Button variant="outline" size="sm" onClick={() => setIsEditingOnboarding(true)}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Preferences
+                </Button>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Update your project types, roles, and specializations to help buyers find you
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isEditingOnboarding ? (
+              <div className="space-y-4">
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    You can always come back to update these preferences later. This helps us match you with the right buyers and projects.
+                  </AlertDescription>
+                </Alert>
+                <SellerOnboarding
+                  onComplete={handleOnboardingSave}
+                  onSkip={() => setIsEditingOnboarding(false)}
+                  initialData={onboardingData || undefined}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {onboardingData ? (
+                  <>
+                    {onboardingData.projectTypes && onboardingData.projectTypes.length > 0 && (
+                      <div>
+                        <Label className="text-sm font-semibold mb-2 block">Project Types</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {onboardingData.projectTypes.map((type, idx) => (
+                            <Badge key={idx} variant="secondary">{type}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {onboardingData.role && onboardingData.role.length > 0 && (
+                      <div>
+                        <Label className="text-sm font-semibold mb-2 block">Roles & Specializations</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {onboardingData.role.map((role, idx) => (
+                            <Badge key={idx} variant="secondary">{role}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {onboardingData.specialCategories && onboardingData.specialCategories.length > 0 && (
+                      <div>
+                        <Label className="text-sm font-semibold mb-2 block">Special Categories</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {onboardingData.specialCategories.map((category, idx) => (
+                            <Badge key={idx} variant="secondary">{category}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-slate-500">
+                    <p className="mb-2">No preferences set yet</p>
+                    <Button variant="outline" onClick={() => setIsEditingOnboarding(true)}>
+                      Set Your Preferences
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
       </main>
+
     </div>
   );
 };

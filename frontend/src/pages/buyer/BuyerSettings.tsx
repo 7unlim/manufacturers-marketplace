@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,21 @@ const BuyerSettings = () => {
   });
   const [language, setLanguage] = useState("en");
   const [currency, setCurrency] = useState("USD");
+  const [buyerName, setBuyerName] = useState<string>("Buyer Account");
+
+  useEffect(() => {
+    const authAccount = localStorage.getItem("authAccount");
+    if (authAccount) {
+      try {
+        const account = JSON.parse(authAccount);
+        if (account.name) {
+          setBuyerName(account.name);
+        }
+      } catch (error) {
+        console.error("Error parsing auth account:", error);
+      }
+    }
+  }, []);
 
   const handleSave = () => {
     localStorage.setItem("buyerSettings", JSON.stringify({
@@ -50,7 +65,7 @@ const BuyerSettings = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-3 px-3">
-                <span className="text-sm font-medium">Buyer Account</span>
+                <span className="text-sm font-medium">{buyerName}</span>
                 <div className="w-9 h-9 rounded-full gradient-hero flex items-center justify-center">
                   <User className="w-5 h-5 text-primary-foreground" />
                 </div>

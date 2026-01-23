@@ -330,7 +330,7 @@ const Auth = () => {
                   </span>
                 </h1>
                 <p className="text-lg text-slate-600 leading-relaxed">
-                  Connect with suppliers, manage bids, and streamline your operations with our powerful marketplace platform.
+                  Connect with suppliers, manage POs, and streamline your operations with our powerful marketplace platform.
                 </p>
               </div>
               
@@ -338,7 +338,7 @@ const Auth = () => {
                 <div className="p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/50 shadow-sm">
                   <ShoppingCart className="w-6 h-6 text-indigo-600 mb-2" />
                   <h3 className="font-semibold text-slate-900 mb-1">For Buyers</h3>
-                  <p className="text-sm text-slate-600">Source materials and create bids</p>
+                  <p className="text-sm text-slate-600">Source materials and create POs</p>
                 </div>
                 <div className="p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/50 shadow-sm">
                   <Factory className="w-6 h-6 text-blue-600 mb-2" />

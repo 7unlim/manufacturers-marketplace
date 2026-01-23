@@ -290,19 +290,19 @@ const SellerDashboard = () => {
       loadBuyerLeads();
       
       if (!companyId) {
-        console.log('Dashboard - loadData: No companyId, skipping companies/materials/bids but buyer leads loaded');
+        console.log('Dashboard - loadData: No companyId, skipping companies/materials/POs but buyer leads loaded');
         setLoading(false);
         return;
       }
 
-      console.log('Dashboard - loadData: Starting to fetch companies, materials, bids...');
+      console.log('Dashboard - loadData: Starting to fetch companies, materials, POs...');
       try {
         const [companiesData, materialsData, bidsData] = await Promise.all([
           fetchCompanies(),
           fetchMaterials({ companyId }),
           fetchBids()
         ]);
-        console.log('Dashboard - loadData: Fetched companies, materials, bids successfully');
+        console.log('Dashboard - loadData: Fetched companies, materials, POs successfully');
         
         // If company wasn't set from account, find it from companies list
         setCompany(prevCompany => {
@@ -1097,7 +1097,7 @@ const SellerDashboard = () => {
                       )}
                     </div>
                     <p className="text-xs text-slate-500 mt-1">
-                      {loadingRevenue ? 'Loading...' : `${revenueData?.totalBids || 0} accepted bids`}
+                      {loadingRevenue ? 'Loading...' : `${revenueData?.totalBids || 0} accepted POs`}
                     </p>
                   </div>
                   <div className="flex gap-1 flex-wrap">
@@ -1236,11 +1236,11 @@ const SellerDashboard = () => {
                   color: "slate" 
                 },
                 { 
-                  label: "Pending Bids", 
+                  label: "Pending POs", 
                   value: stats.pendingBids.toString(), 
                   icon: Inbox, 
                   color: "amber",
-                  link: "/seller/bids"
+                  link: "/seller/POs"
                 },
                 { 
                   label: "Matching Leads", 
@@ -1393,7 +1393,7 @@ const SellerDashboard = () => {
                 <CardHeader className="border-b border-slate-200">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">Recent POs</CardTitle>
-                    <Link to="/seller/bids">
+                    <Link to="/seller/POs">
                       <Button variant="ghost" size="sm">View All</Button>
                     </Link>
                   </div>
@@ -1402,7 +1402,7 @@ const SellerDashboard = () => {
                   {recentBids.length === 0 ? (
                     <div className="p-8 text-center text-slate-500">
                       <Inbox className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                      <p>No bids received yet</p>
+                      <p>No POs received yet</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-200">

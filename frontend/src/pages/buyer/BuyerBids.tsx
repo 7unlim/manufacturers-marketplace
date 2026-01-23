@@ -360,7 +360,7 @@ const BuyerBids = () => {
     if (totalQuantity >= 50) tips.push('Volume qualifies for bulk discount - mention long-term partnership');
     if (bidTerms.paymentTerms === 'prepaid') tips.push('Prepaid orders can negotiate 3-5% additional discount');
     if (!hasRushItems) tips.push('Standard delivery gives room for price negotiation');
-    tips.push('Sellers respond 40% faster to bids with complete contact info');
+    tips.push('Sellers respond 40% faster to POs with complete contact info');
     
     // Determine suggested delivery and payment
     let suggestedDelivery = 'standard';
@@ -534,7 +534,7 @@ const BuyerBids = () => {
       
       // Trigger confetti and toast
       triggerCelebration();
-      toast.success("Bid Submitted Successfully!", {
+      toast.success("PO Submitted Successfully!", {
         description: `PO #${result.bidId} for $${result.totalAmount.toFixed(2)} has been sent to the supplier.`,
         duration: 5000,
       });
@@ -718,7 +718,7 @@ const BuyerBids = () => {
                   <div className="p-4 border-b border-border">
                     <h2 className="font-display font-semibold text-lg">Select Materials</h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Choose a supplier and add materials to your bid
+                      Choose a supplier and add materials to your PO
                     </p>
                   </div>
 
@@ -1214,7 +1214,7 @@ const BuyerBids = () => {
                             });
                           }}>
                             <Plus className="w-4 h-4 mr-2" />
-                            New Bid
+                            New PO
                           </Button>
                         </div>
                       </div>

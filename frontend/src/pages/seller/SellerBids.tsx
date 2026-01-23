@@ -378,7 +378,7 @@ const SellerBids = () => {
 
         {/* Results info */}
         <div className="mt-4 text-sm text-muted-foreground">
-          Showing {filteredPOs.length} of {bids.length} bids
+          Showing {filteredPOs.length} of {bids.length} POs
         </div>
       </main>
 
@@ -670,7 +670,7 @@ const SellerBids = () => {
                           <div className="text-center py-6">
                             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 text-purple-700 border border-purple-500/30 text-sm font-medium">
                               <Check className="w-4 h-4" />
-                              Bid successfully countered
+                              PO successfully countered
                             </div>
                           </div>
                         ) : (
@@ -760,7 +760,7 @@ const SellerBids = () => {
                         <div className="flex items-center justify-between gap-3 pt-2 border-t border-purple-500/10">
                           <p className="text-xs text-muted-foreground max-w-md">
                             When you send this counter, all line comments and the summary will be bundled and stored 
-                            as your seller response for this bid.
+                            as your seller response for this PO.
                           </p>
                           <Button
                             variant="outline"
@@ -799,7 +799,7 @@ const SellerBids = () => {
                       <div className="py-10 text-center space-y-4">
                         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 text-purple-700 border border-purple-500/30 text-sm font-medium">
                           <Check className="w-4 h-4" />
-                          Bid successfully countered
+                          PO successfully countered
                         </div>
                         <p className="text-sm text-muted-foreground max-w-md mx-auto">
                           Your counter offer has been sent to the buyer. You can still review the details in the other tabs.
@@ -807,7 +807,7 @@ const SellerBids = () => {
                       </div>
                     ) : (
                       <div className="text-sm text-muted-foreground py-8 text-center">
-                        Countering is only available while the bid is in <span className="font-medium text-foreground">Response Needed</span> status.
+                        Countering is only available while the PO is in <span className="font-medium text-foreground">Response Needed</span> status.
                       </div>
                     )}
                   </div>

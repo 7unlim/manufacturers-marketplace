@@ -695,7 +695,7 @@ const BuyerCompanies = () => {
                 <Link to={`/buyer/bids?companyId=${selectedCompanyForView.id}`} className="flex-1">
                   <Button className="w-full gradient-hero text-primary-foreground shadow-md hover:shadow-lg transition-all">
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Start Bid
+                    Start PO
                   </Button>
                 </Link>
                 <Button 

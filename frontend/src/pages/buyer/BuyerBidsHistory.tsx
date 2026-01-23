@@ -124,7 +124,7 @@ const BuyerBidsHistory = () => {
       );
       setBids(buyerBids);
     } catch (error) {
-      console.error("Failed to load bids:", error);
+      console.error("Failed to load PO:", error);
     } finally {
       setLoading(false);
     }
@@ -145,7 +145,7 @@ const BuyerBidsHistory = () => {
       setSelectedBid(fullBid);
       setViewDialogOpen(true);
     } catch (error) {
-      console.error("Failed to load bid details:", error);
+      console.error("Failed to load PO details:", error);
     }
   };
 
@@ -240,7 +240,7 @@ const BuyerBidsHistory = () => {
       setSelectedBid(null);
       setEditLineItems([]);
     } catch (error) {
-      console.error("Failed to resubmit bid:", error);
+      console.error("Failed to resubmit PO:", error);
       alert("Failed to resubmit PO. Please try again.");
     } finally {
       setActionLoading(false);
@@ -257,7 +257,7 @@ const BuyerBidsHistory = () => {
       setCancelDialogOpen(false);
       setBidToCancel(null);
     } catch (error) {
-      console.error("Failed to cancel bid:", error);
+      console.error("Failed to cancel PO:", error);
     } finally {
       setActionLoading(false);
     }

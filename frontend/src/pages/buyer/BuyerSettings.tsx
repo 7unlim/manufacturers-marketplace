@@ -142,9 +142,9 @@ const BuyerSettings = () => {
               </div>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="bid-notifications">Bid Updates</Label>
+                  <Label htmlFor="bid-notifications">PO Updates</Label>
                   <p className="text-sm text-muted-foreground">
-                    Get notified about bid status changes
+                    Get notified about PO status changes
                   </p>
                 </div>
                 <Switch

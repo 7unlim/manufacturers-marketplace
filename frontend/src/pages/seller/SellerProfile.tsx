@@ -188,7 +188,7 @@ const SellerProfile = () => {
                 </Button>
               </Link>
               <span className="text-border">|</span>
-              <Link to="/seller/bids">
+              <Link to="/seller/POs">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <Inbox className="w-4 h-4 mr-2" />
                   Bid Inbox

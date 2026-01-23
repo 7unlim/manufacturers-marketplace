@@ -246,7 +246,7 @@ const Landing = () => {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {loadingRevenue ? 'Loading...' : `${revenueData?.totalBids || 0} accepted bids`}
+                        {loadingRevenue ? 'Loading...' : `${revenueData?.totalPOs || 0} accepted bids`}
                       </p>
                     </div>
                     <div className="flex gap-1 flex-wrap">

@@ -10,7 +10,7 @@ import {
   Inbox, MessageSquare, Send, User, ChevronDown, LogOut, Settings, 
   Package, Building2, ShoppingCart, FileText, Home, Search, Sparkles,
   TrendingUp, Target, Star, Info, Edit, Users, Plus, Mail, Bell,
-  CheckCircle2, Clock, DollarSign, FileCheck
+  CheckCircle2, Clock, DollarSign, FileCheck, MapPin, Phone, Shield, Award
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -59,6 +59,8 @@ const BuyerHome = () => {
   const [newMessageDialogOpen, setNewMessageDialogOpen] = useState(false);
   const [selectedSeller, setSelectedSeller] = useState<Company | null>(null);
   const [initialMessage, setInitialMessage] = useState("");
+  const [companyModalOpen, setCompanyModalOpen] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [bids, setBids] = useState<Bid[]>([]);
@@ -321,6 +323,15 @@ const BuyerHome = () => {
     return Building2;
   };
 
+  const getCertifications = (company: Company): string[] => {
+    if (!company.certifications) return [];
+    try {
+      return JSON.parse(company.certifications);
+    } catch {
+      return [];
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -360,14 +371,14 @@ const BuyerHome = () => {
               <Link to="/buyer/bids">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Bid Builder
+                  PO Builder
                 </Button>
               </Link>
               <span className="text-border">|</span>
               <Link to="/buyer/bids/history">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <FileText className="w-4 h-4 mr-2" />
-                  My Bids
+                  My POs
                 </Button>
               </Link>
             </div>
@@ -385,16 +396,16 @@ const BuyerHome = () => {
                   )}
                 </Button>
               </SheetTrigger>
-              <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-                <SheetHeader>
+              <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
+                <SheetHeader className="flex-shrink-0">
                   <SheetTitle>Messages</SheetTitle>
                   <SheetDescription>
                     Connect with sellers and manage your conversations
                   </SheetDescription>
                 </SheetHeader>
                 
-                <div className="mt-6 space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="flex-1 flex flex-col min-h-0 mt-6 space-y-4">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -414,72 +425,73 @@ const BuyerHome = () => {
                     </Button>
                   </div>
 
-                  <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                    {filteredConversations.length === 0 ? (
-                      <div className="p-8 text-center text-muted-foreground">
-                        <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                        <p>No messages yet</p>
-                        <p className="text-sm mt-2">Start a conversation with a seller</p>
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {!selectedConversation ? (
+                      <div className="flex-1 overflow-y-auto space-y-2">
+                        {filteredConversations.length === 0 ? (
+                          <div className="p-8 text-center text-muted-foreground">
+                            <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                            <p>No messages yet</p>
+                            <p className="text-sm mt-2">Start a conversation with a seller</p>
+                          </div>
+                        ) : (
+                          filteredConversations.map((conv) => {
+                            if (!conv || !conv.otherEmail) return null;
+                            return (
+                              <button
+                                key={conv.otherEmail}
+                                onClick={() => {
+                                  setSelectedConversation(conv.otherEmail);
+                                  setSearchParams({ seller: conv.otherEmail });
+                                }}
+                                className={`w-full p-3 text-left rounded-lg border transition-colors ${
+                                  selectedConversation === conv.otherEmail 
+                                    ? "bg-primary/5 border-primary" 
+                                    : "bg-card border-border hover:bg-muted/50"
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <p className="font-semibold text-foreground truncate">
+                                        {conv.otherName || "Unknown"}
+                                      </p>
+                                      {conv.unreadCount > 0 && (
+                                        <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
+                                          {conv.unreadCount}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground truncate">
+                                      {conv.lastMessage || "No message"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {conv.lastMessageTime ? (() => {
+                                        try {
+                                          return formatDistanceToNow(new Date(conv.lastMessageTime), { addSuffix: true });
+                                        } catch {
+                                          return 'Recently';
+                                        }
+                                      })() : 'Just now'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
                       </div>
                     ) : (
-                      filteredConversations.map((conv) => {
-                        if (!conv || !conv.otherEmail) return null;
-                        return (
-                          <button
-                            key={conv.otherEmail}
-                            onClick={() => {
-                              setSelectedConversation(conv.otherEmail);
-                              setSearchParams({ seller: conv.otherEmail });
-                            }}
-                            className={`w-full p-3 text-left rounded-lg border transition-colors ${
-                              selectedConversation === conv.otherEmail 
-                                ? "bg-primary/5 border-primary" 
-                                : "bg-card border-border hover:bg-muted/50"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className="font-semibold text-foreground truncate">
-                                    {conv.otherName || "Unknown"}
-                                  </p>
-                                  {conv.unreadCount > 0 && (
-                                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
-                                      {conv.unreadCount}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-sm text-muted-foreground truncate">
-                                  {conv.lastMessage || "No message"}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {conv.lastMessageTime ? (() => {
-                                    try {
-                                      return formatDistanceToNow(new Date(conv.lastMessageTime), { addSuffix: true });
-                                    } catch {
-                                      return 'Recently';
-                                    }
-                                  })() : 'Just now'}
-                                </p>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {selectedConversation && (
-                    <div className="border-t pt-4 mt-4">
-                      <div className="mb-3">
-                        <p className="font-semibold text-foreground">
-                          {conversations.find(c => c.otherEmail === selectedConversation)?.otherName || "Conversation"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {conversations.find(c => c.otherEmail === selectedConversation)?.otherEmail}
-                        </p>
-                      </div>
-                      <div className="h-[300px] overflow-y-auto space-y-3 mb-3 p-3 bg-muted/30 rounded-lg">
+                      <div className="flex-1 flex flex-col min-h-0 border-t pt-4 mt-4">
+                        <div className="mb-3 flex-shrink-0">
+                          <p className="font-semibold text-foreground">
+                            {conversations.find(c => c.otherEmail === selectedConversation)?.otherName || "Conversation"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {conversations.find(c => c.otherEmail === selectedConversation)?.otherEmail}
+                          </p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-3 mb-3 p-3 bg-muted/30 rounded-lg min-h-0">
                         {messages.map((msg) => {
                           const isSender = msg.senderEmail === buyerEmail;
                           return (
@@ -516,30 +528,31 @@ const BuyerHome = () => {
                             </div>
                           );
                         })}
-                        <div ref={messagesEndRef} />
+                          <div ref={messagesEndRef} />
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0 pt-2">
+                          <Input
+                            placeholder="Type a message..."
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage();
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={handleSendMessage}
+                            disabled={!newMessage.trim() || sending}
+                          >
+                            <Send className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Type a message..."
-                          value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              handleSendMessage();
-                            }
-                          }}
-                          className="flex-1"
-                        />
-                        <Button
-                          onClick={handleSendMessage}
-                          disabled={!newMessage.trim() || sending}
-                        >
-                          <Send className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
@@ -583,19 +596,19 @@ const BuyerHome = () => {
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
         {/* Welcome Section with Preferences */}
-        <div className="mb-8">
+        <div className="mb-10">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-2">
-                Welcome Back, {buyerName}
+              <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
+                Welcome back, {buyerName}
               </h1>
-              <p className="text-muted-foreground text-lg">
+              <p className="text-muted-foreground mt-1">
                 Find the perfect materials for your projects
               </p>
             </div>
             {!onboardingData && (
               <Link to="/buyer/profile">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="shadow-sm">
                   <Edit className="w-4 h-4 mr-2" />
                   Set Preferences
                 </Button>
@@ -605,79 +618,104 @@ const BuyerHome = () => {
 
           {/* Preferences Display */}
           {onboardingData && (
-            <Card className="border-primary/20 bg-primary/5 mb-6">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Target className="w-5 h-5 text-primary" />
-                    Your Preferences
-                  </CardTitle>
-                  <Link to="/buyer/profile">
-                    <Button variant="ghost" size="sm">
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit
-                    </Button>
-                  </Link>
-                </div>
-                <CardDescription>
-                  Materials and projects tailored to your needs
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {onboardingData.materialTypes && onboardingData.materialTypes.length > 0 && (
-                  <div>
-                    <Label className="text-xs font-semibold text-foreground mb-2 block">Material Types</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {onboardingData.materialTypes.slice(0, 5).map((type, idx) => (
-                        <Badge key={idx} variant="secondary">
-                          {type.replace(/^Other: /, '')}
-                        </Badge>
-                      ))}
-                      {onboardingData.materialTypes.length > 5 && (
-                        <Badge variant="secondary">
-                          +{onboardingData.materialTypes.length - 5} more
-                        </Badge>
-                      )}
-                    </div>
+            <div className="mt-6 space-y-4">
+              <Card className="border-indigo-200 bg-gradient-to-r from-indigo-50 to-blue-50">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Target className="w-5 h-5 text-indigo-600" />
+                      Your Preferences
+                    </CardTitle>
+                    <Link to="/buyer/profile">
+                      <Button variant="ghost" size="sm">
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                    </Link>
                   </div>
-                )}
-                
-                {onboardingData.buyerProjectTypes && onboardingData.buyerProjectTypes.length > 0 && (
-                  <div>
-                    <Label className="text-xs font-semibold text-foreground mb-2 block">Project Types</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {onboardingData.buyerProjectTypes.slice(0, 4).map((type, idx) => {
-                        const Icon = getProjectTypeIcon(type);
-                        return (
-                          <Badge key={idx} variant="secondary" className="flex items-center gap-1">
-                            <Icon className="w-3 h-3" />
-                            {type.replace(/^.*? - /, '')}
+                  <CardDescription>
+                    Materials and projects tailored to your needs
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {onboardingData.materialTypes && onboardingData.materialTypes.length > 0 && (
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 mb-2 block">Material Types</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {onboardingData.materialTypes.slice(0, 5).map((type, idx) => (
+                          <Badge key={idx} variant="secondary" className="bg-indigo-100 text-indigo-700 border-indigo-200">
+                            {type.replace(/^Other: /, '')}
                           </Badge>
-                        );
-                      })}
-                      {onboardingData.buyerProjectTypes.length > 4 && (
-                        <Badge variant="secondary">
-                          +{onboardingData.buyerProjectTypes.length - 4} more
-                        </Badge>
+                        ))}
+                        {onboardingData.materialTypes.length > 5 && (
+                          <Badge variant="secondary" className="bg-slate-100 text-slate-600">
+                            +{onboardingData.materialTypes.length - 5} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {onboardingData.buyerProjectTypes && onboardingData.buyerProjectTypes.length > 0 && (
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 mb-2 block">Project Types</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {onboardingData.buyerProjectTypes.slice(0, 4).map((type, idx) => {
+                          const Icon = getProjectTypeIcon(type);
+                          return (
+                            <Badge key={idx} variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 flex items-center gap-1">
+                              <Icon className="w-3 h-3" />
+                              {type.replace(/^.*? - /, '')}
+                            </Badge>
+                          );
+                        })}
+                        {onboardingData.buyerProjectTypes.length > 4 && (
+                          <Badge variant="secondary" className="bg-slate-100 text-slate-600">
+                            +{onboardingData.buyerProjectTypes.length - 4} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {onboardingData.projectScale && onboardingData.projectScale.length > 0 && (
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 mb-2 block">Project Scale</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {onboardingData.projectScale.map((scale, idx) => (
+                          <Badge key={idx} variant="outline" className="border-green-300 text-green-700">
+                            {scale.replace(/^Other: /, '')}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(onboardingData.budgetRange || onboardingData.urgencyLevel) && (
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      {onboardingData.budgetRange && (
+                        <div>
+                          <Label className="text-xs font-semibold text-slate-700 mb-1 block">Budget Range</Label>
+                          <Badge variant="outline" className="border-purple-300 text-purple-700">
+                            <DollarSign className="w-3 h-3 mr-1" />
+                            {onboardingData.budgetRange}
+                          </Badge>
+                        </div>
+                      )}
+                      {onboardingData.urgencyLevel && (
+                        <div>
+                          <Label className="text-xs font-semibold text-slate-700 mb-1 block">Urgency</Label>
+                          <Badge variant="outline" className="border-amber-300 text-amber-700">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {onboardingData.urgencyLevel}
+                          </Badge>
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
-
-                {onboardingData.projectScale && onboardingData.projectScale.length > 0 && (
-                  <div>
-                    <Label className="text-xs font-semibold text-foreground mb-2 block">Project Scale</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {onboardingData.projectScale.map((scale, idx) => (
-                        <Badge key={idx} variant="outline">
-                          {scale.replace(/^Other: /, '')}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {!onboardingData && (
@@ -697,7 +735,7 @@ const BuyerHome = () => {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Total Bids</p>
+                  <p className="text-xs text-muted-foreground mb-1">Total POs</p>
                   <p className="text-xl font-bold text-foreground">{userStats.totalBids}</p>
                 </div>
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -711,7 +749,7 @@ const BuyerHome = () => {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Active Bids</p>
+                  <p className="text-xs text-muted-foreground mb-1">Active POs</p>
                   <p className="text-xl font-bold text-blue-600">{userStats.activeBids}</p>
                 </div>
                 <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -793,16 +831,18 @@ const BuyerHome = () => {
         </div>
 
         {/* Two Column Layout: Inbox + Recommended Materials */}
-        <div className="grid lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid lg:grid-cols-3 gap-6 mb-10">
           {/* Compact Inbox */}
-          <Card className="lg:col-span-1 border-0 shadow-md">
-            <CardHeader className="pb-3">
+          <Card className="lg:col-span-1 border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardHeader className="pb-4 border-b border-border/50">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Inbox className="w-4 h-4" />
-                  Messages
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                    <Inbox className="w-5 h-5 text-primary" />
+                  </div>
+                  <span>Messages</span>
                   {totalUnread > 0 && (
-                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
+                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs ml-1.5">
                       {totalUnread}
                     </Badge>
                   )}
@@ -811,31 +851,36 @@ const BuyerHome = () => {
                   variant="ghost" 
                   size="sm"
                   onClick={() => setInboxOpen(true)}
+                  className="text-primary hover:text-primary/80 hover:bg-primary/5"
                 >
                   View All
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="max-h-[400px] overflow-y-auto">
+              <div className="max-h-[450px] overflow-y-auto">
                 {conversations.length === 0 ? (
-                  <div className="p-6 text-center text-muted-foreground">
-                    <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">No messages yet</p>
+                  <div className="p-8 text-center">
+                    <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                      <MessageSquare className="w-8 h-8 text-muted-foreground opacity-40" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground mb-1">No messages yet</p>
+                    <p className="text-xs text-muted-foreground mb-4">Start a conversation with a seller</p>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="mt-3"
+                      className="shadow-sm"
                       onClick={() => setNewMessageDialogOpen(true)}
                     >
-                      <Plus className="w-3 h-3 mr-2" />
+                      <Plus className="w-4 h-4 mr-2" />
                       Start Conversation
                     </Button>
                   </div>
                 ) : (
-                  <div className="divide-y divide-border">
+                  <div className="divide-y divide-border/50">
                     {conversations.slice(0, 5).map((conv) => {
                       if (!conv || !conv.otherEmail) return null;
+                      const initials = (conv.otherName || "U").split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
                       return (
                         <button
                           key={conv.otherEmail}
@@ -844,26 +889,33 @@ const BuyerHome = () => {
                             setInboxOpen(true);
                             setSearchParams({ seller: conv.otherEmail });
                           }}
-                          className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
-                            selectedConversation === conv.otherEmail ? "bg-primary/5" : ""
+                          className={`w-full p-4 text-left hover:bg-muted/50 transition-all duration-200 ${
+                            selectedConversation === conv.otherEmail ? "bg-primary/5 border-l-2 border-l-primary" : ""
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${
+                              conv.unreadCount > 0 
+                                ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground' 
+                                : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {initials}
+                            </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="font-medium text-sm text-foreground truncate">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <p className="font-semibold text-sm text-foreground truncate">
                                   {conv.otherName || "Unknown"}
                                 </p>
                                 {conv.unreadCount > 0 && (
-                                  <Badge variant="destructive" className="h-4 min-w-4 px-1 text-xs">
+                                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs flex-shrink-0">
                                     {conv.unreadCount}
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-xs text-muted-foreground truncate">
+                              <p className="text-sm text-muted-foreground truncate mb-1">
                                 {conv.lastMessage || "No message"}
                               </p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
+                              <p className="text-xs text-muted-foreground">
                                 {conv.lastMessageTime ? (() => {
                                   try {
                                     return formatDistanceToNow(new Date(conv.lastMessageTime), { addSuffix: true });
@@ -880,10 +932,10 @@ const BuyerHome = () => {
                   </div>
                 )}
                 {conversations.length > 5 && (
-                  <div className="p-3 border-t border-border">
+                  <div className="p-4 border-t border-border/50 bg-muted/20">
                     <Button 
                       variant="ghost" 
-                      className="w-full text-xs"
+                      className="w-full text-sm font-medium"
                       onClick={() => setInboxOpen(true)}
                     >
                       View {conversations.length - 5} more conversation{conversations.length - 5 !== 1 ? 's' : ''}
@@ -898,64 +950,71 @@ const BuyerHome = () => {
           <div className="lg:col-span-2">
             {recommendedMaterials.length > 0 ? (
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Star className="w-5 h-5 text-primary" />
-                    <h2 className="text-xl font-bold text-foreground">Recommended for You</h2>
-                    <Badge variant="secondary">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                      <Star className="w-5 h-5 text-primary fill-primary" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-foreground">Recommended for You</h2>
+                      <p className="text-sm text-muted-foreground">Materials matched to your preferences</p>
+                    </div>
+                    <Badge variant="secondary" className="ml-2">
                       {recommendedMaterials.length} matches
                     </Badge>
                   </div>
                   <Link to="/buyer/materials">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" className="shadow-sm">
                       View All Materials
                     </Button>
                   </Link>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {recommendedMaterials.map((material) => {
                     const isMatch = getMaterialMatchScore(material) > 0;
                     return (
-                      <Card key={material.id} className={`border-2 transition-all hover:shadow-lg ${isMatch ? 'border-primary/30 bg-primary/5' : 'border-border'}`}>
-                        <CardHeader className="pb-3">
+                      <Card key={material.id} className={`border-2 transition-all duration-300 hover:shadow-xl hover:scale-[1.02] ${isMatch ? 'border-primary/40 bg-gradient-to-br from-primary/10 to-primary/5' : 'border-border hover:border-primary/20'}`}>
+                        <CardHeader className="pb-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <CardTitle className="text-base mb-1">{material.name}</CardTitle>
+                              <CardTitle className="text-lg font-semibold mb-2">{material.name}</CardTitle>
                               <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge variant="secondary" className="text-xs font-medium">
                                   {material.type}
                                 </Badge>
                                 {material.code && (
-                                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                  <code className="text-xs bg-muted/80 px-2 py-1 rounded-md text-muted-foreground font-mono">
                                     {material.code}
                                   </code>
                                 )}
                               </div>
                             </div>
                             {isMatch && (
-                              <Star className="w-4 h-4 text-primary fill-primary" />
+                              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                <Star className="w-4 h-4 text-primary fill-primary" />
+                              </div>
                             )}
                           </div>
                         </CardHeader>
-                        <CardContent className="space-y-3">
+                        <CardContent className="space-y-4">
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Building2 className="w-4 h-4" />
-                            <span>{material.companyName}</span>
+                            <span className="font-medium">{material.companyName}</span>
                           </div>
-                          <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="grid grid-cols-2 gap-4 p-3 bg-muted/50 rounded-lg">
                             <div>
-                              <p className="text-xs text-muted-foreground">Price</p>
-                              <p className="font-bold text-foreground">${material.baseUnitPrice.toFixed(2)}</p>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Price</p>
+                              <p className="text-lg font-bold text-foreground">${material.baseUnitPrice.toFixed(2)}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-muted-foreground">Stock</p>
-                              <p className="font-semibold text-foreground">{material.stock.toLocaleString()}</p>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Stock</p>
+                              <p className="text-lg font-semibold text-foreground">{material.stock.toLocaleString()}</p>
                             </div>
                           </div>
                           <Link to={`/buyer/bids?materialId=${material.id}&companyId=${material.companyId}`}>
-                            <Button className="w-full" size="sm">
+                            <Button className="w-full gradient-hero text-primary-foreground shadow-sm hover:shadow-md transition-all" size="sm">
                               <Plus className="w-4 h-4 mr-2" />
-                              Add to Bid
+                              Add to PO
                             </Button>
                           </Link>
                         </CardContent>
@@ -985,41 +1044,56 @@ const BuyerHome = () => {
 
         {/* Recommended Companies */}
         {recommendedCompanies.length > 0 && onboardingData && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-bold text-foreground">Recommended Partners</h2>
+          <div className="mb-10">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground">Recommended Partners</h2>
+                  <p className="text-sm text-muted-foreground">Companies that match your project needs</p>
+                </div>
               </div>
               <Link to="/buyer/companies">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="shadow-sm">
                   View All Companies
                 </Button>
               </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               {recommendedCompanies.map((company) => (
-                <Card key={company.id} className="border-border hover:border-primary/50 transition-all hover:shadow-md">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">{company.name}</CardTitle>
-                    <CardDescription className="text-xs line-clamp-2">{company.location}</CardDescription>
+                <Card key={company.id} className="border-border hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:scale-[1.02]">
+                  <CardHeader className="pb-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mb-3">
+                      <Building2 className="w-6 h-6 text-primary" />
+                    </div>
+                    <CardTitle className="text-base font-semibold">{company.name}</CardTitle>
+                    <CardDescription className="text-xs line-clamp-2 mt-1">{company.location}</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        {materials.filter(m => m.companyId === company.id).length} materials
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                      <span className="text-sm font-medium text-muted-foreground">Materials</span>
+                      <span className="text-sm font-bold text-foreground">
+                        {materials.filter(m => m.companyId === company.id).length}
                       </span>
                     </div>
                     <div className="flex gap-2">
-                      <Link to={`/buyer/companies`} className="flex-1">
-                        <Button variant="outline" size="sm" className="w-full">
-                          View
-                        </Button>
-                      </Link>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => {
+                          setSelectedCompany(company);
+                          setCompanyModalOpen(true);
+                        }}
+                      >
+                        View
+                      </Button>
                       <Button 
                         variant="default" 
                         size="sm"
-                        className="flex-1"
+                        className="flex-1 gradient-hero text-primary-foreground shadow-sm"
                         onClick={() => {
                           setSelectedSeller(company);
                           setNewMessageDialogOpen(true);
@@ -1037,17 +1111,17 @@ const BuyerHome = () => {
         )}
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <Link to="/buyer/materials">
-            <Card className="border-0 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group hover:scale-[1.02] bg-gradient-to-br from-background to-primary/5">
               <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Package className="w-6 h-6 text-primary" />
+                <div className="flex items-center gap-5">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Package className="w-7 h-7 text-primary" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground mb-1">Browse Materials</h3>
-                    <p className="text-sm text-muted-foreground">Search and filter materials</p>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg text-foreground mb-1">Browse Materials</h3>
+                    <p className="text-sm text-muted-foreground">Search and filter materials from all partners</p>
                   </div>
                 </div>
               </CardContent>
@@ -1055,52 +1129,33 @@ const BuyerHome = () => {
           </Link>
 
           <Link to="/buyer/bids">
-            <Card className="border-0 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group hover:scale-[1.02] bg-gradient-to-br from-background to-purple-500/5">
               <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-purple-600" />
+                <div className="flex items-center gap-5">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Sparkles className="w-7 h-7 text-purple-600" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground mb-1">Create Bid</h3>
-                    <p className="text-sm text-muted-foreground">Build and submit bids</p>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg text-foreground mb-1">Create PO</h3>
+                    <p className="text-sm text-muted-foreground">Build and submit POs for your projects</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </Link>
-
-          <Card 
-            className="border-0 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => setInboxOpen(true)}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                  <MessageSquare className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">Messages</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {totalUnread > 0 ? `${totalUnread} unread message${totalUnread !== 1 ? 's' : ''}` : 'View conversations'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </main>
 
       {/* New Message Dialog */}
       <Dialog open={newMessageDialogOpen} onOpenChange={setNewMessageDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Send Message to Seller</DialogTitle>
             <DialogDescription>
               Start a conversation with a seller
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto space-y-4 py-4 min-h-0">
             {!selectedSeller ? (
               <div className="space-y-3">
                 <div>
@@ -1156,7 +1211,7 @@ const BuyerHome = () => {
                     className="mt-2 min-h-[120px]"
                   />
                 </div>
-                <div className="flex justify-end gap-3 pt-4 border-t">
+                <div className="flex justify-end gap-3 pt-4 border-t flex-shrink-0">
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -1178,6 +1233,125 @@ const BuyerHome = () => {
               </>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Company Info Dialog */}
+      <Dialog open={companyModalOpen} onOpenChange={setCompanyModalOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-display flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-primary" />
+              </div>
+              {selectedCompany?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedCompany?.location}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCompany && (
+            <div className="space-y-6 mt-4">
+              {/* Description */}
+              {selectedCompany.description && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">About</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {selectedCompany.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Contact Information */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground mb-2">Contact Information</h3>
+                <div className="space-y-2">
+                  {selectedCompany.location && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <MapPin className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{selectedCompany.location}</span>
+                    </div>
+                  )}
+                  {selectedCompany.phone && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{selectedCompany.phone}</span>
+                    </div>
+                  )}
+                  {selectedCompany.email && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{selectedCompany.email}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Certifications */}
+              {getCertifications(selectedCompany).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Certifications
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {getCertifications(selectedCompany).map((cert, idx) => (
+                      <Badge 
+                        key={idx} 
+                        variant="secondary" 
+                        className="bg-green-500/10 text-green-700 border-green-300 flex items-center gap-1.5"
+                      >
+                        <Award className="w-3 h-3" />
+                        {cert}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Materials Count */}
+              <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-5 h-5 text-primary" />
+                    <span className="text-sm font-medium text-foreground">Available Materials</span>
+                  </div>
+                  <span className="text-2xl font-bold text-primary">
+                    {materials.filter(m => m.companyId === selectedCompany.id).length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t">
+                <Link to={`/buyer/materials?companyId=${selectedCompany.id}`} className="flex-1">
+                  <Button variant="outline" className="w-full">
+                    <Package className="w-4 h-4 mr-2" />
+                    View Materials
+                  </Button>
+                </Link>
+                <Link to={`/buyer/bids?companyId=${selectedCompany.id}`} className="flex-1">
+                  <Button className="w-full gradient-hero text-primary-foreground">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Start PO
+                  </Button>
+                </Link>
+                <Button 
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setCompanyModalOpen(false);
+                    setSelectedSeller(selectedCompany);
+                    setNewMessageDialogOpen(true);
+                  }}
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  Message
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

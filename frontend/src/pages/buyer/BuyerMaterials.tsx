@@ -20,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Search, Package, Users, Building2, ChevronDown, LogOut, Settings, User, Plus, Sparkles, ShoppingCart, Shield, Award, FileText, Wand2, Loader2, TrendingUp, Target, Star, Info, Edit, Home, Factory, Briefcase, Wrench, DollarSign, Clock } from "lucide-react";
 import {
   DropdownMenu,
@@ -49,6 +49,7 @@ import { fetchCompanies, fetchMaterials, findMaterialsWithAI, type Company, type
 import { type BuyerOnboardingData } from "@/lib/api";
 
 const BuyerHome = () => {
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
@@ -72,6 +73,12 @@ const BuyerHome = () => {
         ]);
         setCompanies(companiesData);
         setMaterials(materialsData);
+        
+        // Check for companyId in URL params
+        const companyId = searchParams.get("companyId");
+        if (companyId) {
+          setCompanyFilter(companyId);
+        }
       } catch (error) {
         console.error("Failed to load data:", error);
       } finally {
@@ -95,7 +102,7 @@ const BuyerHome = () => {
         console.error("Error parsing auth account:", error);
       }
     }
-  }, []);
+  }, [searchParams]);
 
   const materialTypes = useMemo(() => {
     return Array.from(new Set(materials.map((m) => m.type)));
@@ -141,14 +148,6 @@ const BuyerHome = () => {
       .slice(0, 6)
       .map(item => item.material);
   }, [materials, onboardingData, preferredMaterialTypes]);
-
-  // Get recommended companies based on project types
-  const recommendedCompanies = useMemo(() => {
-    if (!onboardingData?.buyerProjectTypes || onboardingData.buyerProjectTypes.length === 0) return [];
-    
-    // For now, return all companies (can be enhanced with matching logic)
-    return companies.slice(0, 4);
-  }, [companies, onboardingData]);
 
   const filteredMaterials = useMemo(() => {
     return materials.filter((m) => {
@@ -243,14 +242,14 @@ const BuyerHome = () => {
               <Link to="/buyer/bids">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Bid Builder
+                  PO Builder
                 </Button>
               </Link>
               <span className="text-border">|</span>
               <Link to="/buyer/bids/history">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <FileText className="w-4 h-4 mr-2" />
-                  My Bids
+                  My POs
                 </Button>
               </Link>
             </div>
@@ -313,118 +312,6 @@ const BuyerHome = () => {
               </Link>
             )}
           </div>
-
-          {/* Preferences Display */}
-          {onboardingData && (
-            <div className="mt-6 space-y-4">
-              <Card className="border-indigo-200 bg-gradient-to-r from-indigo-50 to-blue-50">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Target className="w-5 h-5 text-indigo-600" />
-                      Your Preferences
-                    </CardTitle>
-                    <Link to="/buyer/profile">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit
-                      </Button>
-                    </Link>
-                  </div>
-                  <CardDescription>
-                    Materials and projects tailored to your needs
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {onboardingData.materialTypes && onboardingData.materialTypes.length > 0 && (
-                    <div>
-                      <Label className="text-xs font-semibold text-slate-700 mb-2 block">Material Types</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {onboardingData.materialTypes.slice(0, 5).map((type, idx) => (
-                          <Badge key={idx} variant="secondary" className="bg-indigo-100 text-indigo-700 border-indigo-200">
-                            {type.replace(/^Other: /, '')}
-                          </Badge>
-                        ))}
-                        {onboardingData.materialTypes.length > 5 && (
-                          <Badge variant="secondary" className="bg-slate-100 text-slate-600">
-                            +{onboardingData.materialTypes.length - 5} more
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {onboardingData.buyerProjectTypes && onboardingData.buyerProjectTypes.length > 0 && (
-                    <div>
-                      <Label className="text-xs font-semibold text-slate-700 mb-2 block">Project Types</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {onboardingData.buyerProjectTypes.slice(0, 4).map((type, idx) => {
-                          const Icon = getProjectTypeIcon(type);
-                          return (
-                            <Badge key={idx} variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 flex items-center gap-1">
-                              <Icon className="w-3 h-3" />
-                              {type.replace(/^.*? - /, '')}
-                            </Badge>
-                          );
-                        })}
-                        {onboardingData.buyerProjectTypes.length > 4 && (
-                          <Badge variant="secondary" className="bg-slate-100 text-slate-600">
-                            +{onboardingData.buyerProjectTypes.length - 4} more
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {onboardingData.projectScale && onboardingData.projectScale.length > 0 && (
-                    <div>
-                      <Label className="text-xs font-semibold text-slate-700 mb-2 block">Project Scale</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {onboardingData.projectScale.map((scale, idx) => (
-                          <Badge key={idx} variant="outline" className="border-green-300 text-green-700">
-                            {scale.replace(/^Other: /, '')}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {(onboardingData.budgetRange || onboardingData.urgencyLevel) && (
-                    <div className="grid grid-cols-2 gap-4 pt-2">
-                      {onboardingData.budgetRange && (
-                        <div>
-                          <Label className="text-xs font-semibold text-slate-700 mb-1 block">Budget Range</Label>
-                          <Badge variant="outline" className="border-purple-300 text-purple-700">
-                            <DollarSign className="w-3 h-3 mr-1" />
-                            {onboardingData.budgetRange}
-                          </Badge>
-                        </div>
-                      )}
-                      {onboardingData.urgencyLevel && (
-                        <div>
-                          <Label className="text-xs font-semibold text-slate-700 mb-1 block">Urgency</Label>
-                          <Badge variant="outline" className="border-amber-300 text-amber-700">
-                            <Clock className="w-3 h-3 mr-1" />
-                            {onboardingData.urgencyLevel}
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {!onboardingData && (
-            <Alert className="mt-4 border-blue-200 bg-blue-50">
-              <Info className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-900">
-                <strong>Get personalized recommendations!</strong> Set your material preferences and project types in your{" "}
-                <Link to="/buyer/profile" className="underline font-medium">profile</Link> to see materials tailored to your needs.
-              </AlertDescription>
-            </Alert>
-          )}
         </div>
 
         {/* Stats Cards */}
@@ -542,47 +429,13 @@ const BuyerHome = () => {
                       <Link to={`/buyer/bids?materialId=${material.id}&companyId=${material.companyId}`}>
                         <Button className="w-full" size="sm">
                           <Plus className="w-4 h-4 mr-2" />
-                          Add to Bid
+                          Add to PO
                         </Button>
                       </Link>
                     </CardContent>
                   </Card>
                 );
               })}
-            </div>
-          </div>
-        )}
-
-        {/* Recommended Companies */}
-        {recommendedCompanies.length > 0 && onboardingData && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-blue-600" />
-                <h2 className="text-xl font-bold text-slate-900">Recommended Partners</h2>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {recommendedCompanies.map((company) => (
-                <Card key={company.id} className="border-slate-200 hover:border-blue-300 transition-all hover:shadow-md">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">{company.name}</CardTitle>
-                    <CardDescription className="text-xs line-clamp-2">{company.location}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">
-                        {materials.filter(m => m.companyId === company.id).length} materials
-                      </span>
-                      <Link to={`/buyer/companies`}>
-                        <Button variant="outline" size="sm">
-                          View
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
             </div>
           </div>
         )}
@@ -737,7 +590,7 @@ const BuyerHome = () => {
                               >
                                 <Button className="w-full" size="sm">
                                   <ShoppingCart className="w-4 h-4 mr-2" />
-                                  Add to Bid
+                                  Add to PO
                                 </Button>
                               </Link>
                             </div>
@@ -903,7 +756,7 @@ const BuyerHome = () => {
                 </Button>
                 <Link to={`/buyer/bids?companyId=${selectedCompany.id}`} className="flex-1">
                   <Button className="w-full gradient-hero text-white">
-                    Start Bid
+                    Start PO
                   </Button>
                 </Link>
               </div>

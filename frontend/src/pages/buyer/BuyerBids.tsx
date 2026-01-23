@@ -372,7 +372,7 @@ const BuyerBids = () => {
     
     // Generate justification
     const companyName = companies.find(c => c.id === Number(selectedCompanyId))?.name || 'your company';
-    const suggestedJustification = `We are submitting this bid for ${lineItems.length} material${lineItems.length > 1 ? 's' : ''} totaling ${totalQuantity} units. ${
+    const suggestedJustification = `We are submitting this PO for ${lineItems.length} material${lineItems.length > 1 ? 's' : ''} totaling ${totalQuantity} units. ${
       totalQuantity >= 50 
         ? `Given our volume commitment, we believe the proposed pricing reflects a fair bulk discount. ` 
         : ''
@@ -535,7 +535,7 @@ const BuyerBids = () => {
       // Trigger confetti and toast
       triggerCelebration();
       toast.success("Bid Submitted Successfully!", {
-        description: `Bid #${result.bidId} for $${result.totalAmount.toFixed(2)} has been sent to the supplier.`,
+        description: `PO #${result.bidId} for $${result.totalAmount.toFixed(2)} has been sent to the supplier.`,
         duration: 5000,
       });
       
@@ -543,8 +543,8 @@ const BuyerBids = () => {
       setTimeout(() => setShowCelebration(false), 4000);
     } catch (err) {
       console.error(err);
-      setError("Failed to submit bid");
-      toast.error("Failed to submit bid", {
+      setError("Failed to submit PO");
+      toast.error("Failed to submit PO", {
         description: "Please try again or contact support.",
       });
     }
@@ -596,13 +596,13 @@ const BuyerBids = () => {
               <span className="text-border">|</span>
               <Button variant="ghost" className="text-primary font-medium">
                 <Sparkles className="w-4 h-4 mr-2" />
-                Bid Builder
+                PO Builder
               </Button>
               <span className="text-border">|</span>
-              <Link to="/buyer/bids/history">
+              <Link to="/buyer/pos/history">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <FileText className="w-4 h-4 mr-2" />
-                  My Bids
+                  My POs
                 </Button>
               </Link>
             </div>
@@ -651,10 +651,10 @@ const BuyerBids = () => {
             {/* Header */}
             <div>
               <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
-                Bid Builder
+                PO Builder
               </h1>
               <p className="text-muted-foreground mt-1">
-                Create a bid with AI-optimized pricing
+                Create a PO with AI-optimized pricing
               </p>
             </div>
 
@@ -749,9 +749,9 @@ const BuyerBids = () => {
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
                         <DialogHeader>
-                          <DialogTitle>Add Material to Bid</DialogTitle>
+                          <DialogTitle>Add Material to PO</DialogTitle>
                           <DialogDescription>
-                            Select a material to add to your bid package
+                            Select a material to add to your PO package
                           </DialogDescription>
                         </DialogHeader>
                         <div className="overflow-y-auto flex-1 -mx-6 px-6">
@@ -953,7 +953,7 @@ const BuyerBids = () => {
 
                   {/* Quick Summary */}
                   <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                    <p className="text-sm text-muted-foreground mb-2">Bid Summary</p>
+                    <p className="text-sm text-muted-foreground mb-2">PO Summary</p>
                     <div className="flex items-center justify-between">
                       <span className="font-medium">
                         {lineItems.length} material{lineItems.length !== 1 ? 's' : ''} to {companies.find(c => c.id === Number(selectedCompanyId))?.name || 'supplier'}
@@ -1063,11 +1063,11 @@ const BuyerBids = () => {
                   <div>
                     <h2 className="font-display font-semibold text-lg">Review & Submit</h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Review your bid details and add any final notes before submitting
+                      Review your PO details and add any final notes before submitting
                     </p>
                   </div>
 
-                  {/* Bid Summary */}
+                  {/* PO Summary */}
                   <div className="space-y-4">
                     <div className="p-4 rounded-lg border border-border bg-muted/30">
                       <h3 className="font-medium mb-3 flex items-center gap-2">
@@ -1137,7 +1137,7 @@ const BuyerBids = () => {
 
                   {/* Notes Section */}
                   <div className="space-y-4 pt-4 border-t border-border">
-                    <h3 className="font-medium">Bid Justification & Notes</h3>
+                    <h3 className="font-medium">PO Justification & Notes</h3>
                     <p className="text-sm text-muted-foreground">
                       Add context to help the seller understand your pricing. Strong justifications improve acceptance rates.
                     </p>
@@ -1170,7 +1170,7 @@ const BuyerBids = () => {
                         onClick={handleSubmit}
                       >
                         <Send className="w-5 h-5 mr-2" />
-                        Submit Bid Package
+                        Submit PO Package
                       </Button>
                     ) : (
                       <div className="text-center py-8">
@@ -1178,13 +1178,13 @@ const BuyerBids = () => {
                           <PartyPopper className="w-10 h-10 text-green-500" />
                         </div>
                         <h3 className="text-2xl font-display font-bold text-green-600 mb-2">
-                          Bid Submitted! 🎉
+                          PO Submitted! 🎉
                         </h3>
                         <p className="text-muted-foreground mb-4">
-                          Your bid has been sent to the supplier
+                          Your PO has been sent to the supplier
                         </p>
                         <div className="inline-block p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-                          <p className="text-sm text-muted-foreground">Bid Reference</p>
+                          <p className="text-sm text-muted-foreground">PO Reference</p>
                           <p className="text-2xl font-display font-bold text-green-600">
                             #{submitResult.bidId}
                           </p>
@@ -1193,10 +1193,10 @@ const BuyerBids = () => {
                           </p>
                         </div>
                         <div className="mt-6 flex gap-3 justify-center">
-                          <Link to="/buyer/bids/history">
+                          <Link to="/buyer/pos/history">
                             <Button variant="outline">
                               <FileText className="w-4 h-4 mr-2" />
-                              View My Bids
+                              View My POs
                             </Button>
                           </Link>
                           <Button onClick={() => {
@@ -1267,7 +1267,7 @@ const BuyerBids = () => {
                     <Wand2 className="w-7 h-7 text-primary-foreground" />
                   </div>
                   <div>
-                    <h2 className="font-display font-bold text-lg">AI Bid Assistant</h2>
+                    <h2 className="font-display font-bold text-lg">AI PO Assistant</h2>
                     <p className="text-sm text-muted-foreground">Get AI-powered optimization</p>
                   </div>
                 </div>
@@ -1289,7 +1289,7 @@ const BuyerBids = () => {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground mb-4">
-                    Analyze your bid to get pricing suggestions, market insights, and recommendations
+                    Analyze your PO to get pricing suggestions, market insights, and recommendations
                   </p>
                 )}
                 
@@ -1310,8 +1310,8 @@ const BuyerBids = () => {
                           <Wand2 className="w-6 h-6 text-primary-foreground" />
                         </div>
                         <div>
-                          <SheetTitle className="font-display text-xl">AI Bid Assistant</SheetTitle>
-                          <SheetDescription>Optimize your bid with market intelligence</SheetDescription>
+                          <SheetTitle className="font-display text-xl">AI PO Assistant</SheetTitle>
+                          <SheetDescription>Optimize your PO with market intelligence</SheetDescription>
                         </div>
                       </div>
                     </SheetHeader>
@@ -1529,7 +1529,7 @@ const BuyerBids = () => {
             {/* Bid Summary Card */}
             <div className="rounded-xl bg-card border border-border overflow-hidden">
               <div className="p-5 border-b border-border bg-muted/30">
-                <h2 className="font-display font-semibold">Bid Summary</h2>
+                <h2 className="font-display font-semibold">PO Summary</h2>
               </div>
               <div className="p-5 space-y-4">
                 <div className="flex items-center justify-between">

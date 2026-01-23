@@ -6,9 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useNavigate } from "react-router-dom";
 import { Package, ShoppingCart, Factory, ArrowRight, Loader2, Mail, Lock, User, Sparkles, CheckCircle2 } from "lucide-react";
-import { signUp, signIn, type AuthAccount } from "@/lib/api";
+import { signUp, signIn, createCompany, type AuthAccount } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import SellerOnboarding, { type OnboardingData } from "@/components/SellerOnboarding";
+import SellerOnboarding, { type OnboardingData, type CompanyProfileData } from "@/components/SellerOnboarding";
 import BuyerOnboarding, { type BuyerOnboardingData } from "@/components/BuyerOnboarding";
 
 const Auth = () => {
@@ -130,13 +130,67 @@ const Auth = () => {
     }
   };
 
-  const handleSellerOnboardingComplete = async (onboardingData: OnboardingData) => {
+  const handleSellerOnboardingComplete = async (onboardingData: OnboardingData, companyData?: CompanyProfileData) => {
     if (!pendingAccount) return;
 
     try {
-      // Save onboarding data to localStorage
+      let companyId = pendingAccount.companyId;
+      let company = pendingAccount.company;
+      
+      // Create company if company data is provided
+      if (companyData) {
+        try {
+          const createdCompany = await createCompany({
+            name: companyData.name,
+            phone: companyData.phone,
+            email: companyData.email,
+            location: companyData.location,
+            description: companyData.description,
+            certifications: JSON.stringify(companyData.certifications)
+          });
+          companyId = createdCompany.id;
+          company = createdCompany;
+          
+          // Update account via API to link company
+          try {
+            await signUp({
+              email: pendingAccount.email,
+              password: "temp", // Required but not used for update
+              name: pendingAccount.name,
+              role: "seller",
+              companyId: companyId,
+              companyData: companyData
+            });
+          } catch (error) {
+            console.error("Error updating account with company ID:", error);
+            // Continue anyway - company is created
+          }
+        } catch (error) {
+          console.error("Error creating company:", error);
+          toast({
+            title: "Company creation failed",
+            description: "Your account was created, but company profile creation failed. You can add it later.",
+            variant: "destructive",
+          });
+        }
+      }
+
+      // Update preferences with onboarding data
+      try {
+        const { updatePreferences } = await import("@/lib/api");
+        await updatePreferences({
+          email: pendingAccount.email,
+          onboarding: onboardingData
+        });
+      } catch (error) {
+        console.error("Error updating preferences:", error);
+      }
+
+      // Save updated account data to localStorage
       const accountWithOnboarding = {
         ...pendingAccount,
+        companyId,
+        company,
         onboarding: onboardingData
       };
       localStorage.setItem("authAccount", JSON.stringify(accountWithOnboarding));
@@ -203,6 +257,7 @@ const Auth = () => {
       <SellerOnboarding
         onComplete={handleSellerOnboardingComplete}
         onSkip={handleSkipOnboarding}
+        showCompanyProfile={true}
       />
     );
   }

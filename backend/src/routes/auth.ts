@@ -88,7 +88,7 @@ initializeAccounts();
 // Sign up endpoint
 router.post('/signup', (req, res) => {
   try {
-    const { email, password, name, role, companyId, onboarding } = req.body;
+    const { email, password, name, role, companyId, onboarding, companyData } = req.body;
 
     if (!email || !password || !name || !role) {
       return res.status(400).json({ error: 'Email, password, name, and role are required' });
@@ -101,7 +101,77 @@ router.post('/signup', (req, res) => {
     const accounts = loadAccounts();
 
     // Check if email already exists
-    if (accounts.some((acc) => acc.email.toLowerCase() === email.toLowerCase())) {
+    const existingAccountIndex = accounts.findIndex((acc) => acc.email.toLowerCase() === email.toLowerCase());
+    
+    let finalCompanyId = companyId;
+
+    // Create company for seller if company data is provided
+    if (role === 'seller' && companyData && !companyId) {
+      try {
+        const { name: companyName, phone, email: companyEmail, location, description, certifications } = companyData;
+        
+        if (companyName && phone && companyEmail) {
+          const stmt = db.prepare(`
+            INSERT INTO companies (name, phone, email, location, description, certifications)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `);
+          
+          const certificationsJson = certifications && Array.isArray(certifications) 
+            ? JSON.stringify(certifications) 
+            : null;
+          
+          const result = stmt.run(
+            companyName, 
+            phone, 
+            companyEmail, 
+            location || null, 
+            description || null, 
+            certificationsJson
+          );
+          
+          finalCompanyId = result.lastInsertRowid as number;
+          console.log(`Created company with ID ${finalCompanyId} for seller ${email}`);
+        }
+      } catch (error) {
+        console.error('Error creating company during signup:', error);
+        // Continue with account creation even if company creation fails
+      }
+    }
+
+    // If account exists and we're updating with company data, update it
+    if (existingAccountIndex !== -1 && role === 'seller' && finalCompanyId) {
+      // Update existing account with company ID
+      accounts[existingAccountIndex].companyId = finalCompanyId;
+      if (onboarding) {
+        accounts[existingAccountIndex].onboarding = onboarding;
+      }
+      saveAccounts(accounts);
+      
+      // Get company info
+      let company = null;
+      if (finalCompanyId) {
+        const companyData = db
+          .prepare('SELECT * FROM companies WHERE id = ?')
+          .get(finalCompanyId) as any;
+        if (companyData) {
+          company = companyData;
+        }
+      }
+      
+      return res.json({
+        message: 'Account updated successfully',
+        account: {
+          email: accounts[existingAccountIndex].email,
+          name: accounts[existingAccountIndex].name,
+          role: accounts[existingAccountIndex].role,
+          companyId: accounts[existingAccountIndex].companyId,
+          company,
+          onboarding: accounts[existingAccountIndex].onboarding,
+        },
+      });
+    }
+    
+    if (existingAccountIndex !== -1) {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
@@ -111,12 +181,23 @@ router.post('/signup', (req, res) => {
       password, // In production, this should be hashed
       role,
       name,
-      companyId: role === 'seller' ? companyId : undefined,
+      companyId: role === 'seller' ? finalCompanyId : undefined,
       onboarding: req.body.onboarding || undefined,
     };
 
     accounts.push(newAccount);
     saveAccounts(accounts);
+
+    // Get company info if seller
+    let company = null;
+    if (role === 'seller' && finalCompanyId) {
+      const companyData = db
+        .prepare('SELECT * FROM companies WHERE id = ?')
+        .get(finalCompanyId) as any;
+      if (companyData) {
+        company = companyData;
+      }
+    }
 
     res.json({
       message: 'Account created successfully',
@@ -125,6 +206,7 @@ router.post('/signup', (req, res) => {
         name: newAccount.name,
         role: newAccount.role,
         companyId: newAccount.companyId,
+        company,
         onboarding: newAccount.onboarding,
       },
     });

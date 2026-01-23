@@ -30,6 +30,35 @@ router.get('/:id', (req, res) => {
   });
 });
 
+router.post('/', (req, res) => {
+  try {
+    const { name, phone, email, location, description, certifications } = req.body;
+
+    if (!name || !phone || !email) {
+      return res.status(400).json({ error: 'Name, phone, and email are required' });
+    }
+
+    // Create new company
+    const stmt = db.prepare(`
+      INSERT INTO companies (name, phone, email, location, description, certifications)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    
+    const certificationsJson = certifications ? JSON.stringify(certifications) : null;
+    const result = stmt.run(name, phone, email, location || null, description || null, certificationsJson);
+
+    // Fetch created company
+    const newCompany = db
+      .prepare('SELECT * FROM companies WHERE id = ?')
+      .get(result.lastInsertRowid);
+
+    res.json(newCompany);
+  } catch (error) {
+    console.error('Error creating company:', error);
+    res.status(500).json({ error: 'Failed to create company' });
+  }
+});
+
 router.put('/:id', (req, res) => {
   const companyId = Number(req.params.id);
   const { name, phone, email, location, description, certifications } = req.body;

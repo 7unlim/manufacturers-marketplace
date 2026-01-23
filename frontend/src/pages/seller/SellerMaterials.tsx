@@ -412,10 +412,10 @@ const SellerMaterials = () => {
                 Materials
               </Button>
               <span className="text-border">|</span>
-              <Link to="/seller/bids">
+              <Link to="/seller/pos">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <Inbox className="w-4 h-4 mr-2" />
-                  Bid Inbox
+                  PO Inbox
                 </Button>
               </Link>
             </div>

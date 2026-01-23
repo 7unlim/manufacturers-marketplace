@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,6 +70,7 @@ const BuyerBidsHistory = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [buyerName, setBuyerName] = useState<string>("Buyer Account");
+  const [buyerEmail, setBuyerEmail] = useState<string>("");
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -104,23 +105,39 @@ const BuyerBidsHistory = () => {
         if (account.name) {
           setBuyerName(account.name);
         }
+        if (account.email) {
+          setBuyerEmail(account.email);
+        }
       } catch (error) {
         console.error("Error parsing auth account:", error);
       }
     }
-    loadBids();
   }, []);
 
-  const loadBids = async () => {
+  const loadBids = useCallback(async () => {
     try {
       const data = await fetchBids();
-      setBids(data);
+      // Filter bids for this buyer
+      const buyerBids = data.filter(bid => 
+        bid.buyerEmail?.toLowerCase() === buyerEmail?.toLowerCase() || 
+        bid.buyerName === buyerName
+      );
+      setBids(buyerBids);
     } catch (error) {
       console.error("Failed to load bids:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [buyerEmail, buyerName]);
+
+  useEffect(() => {
+    // Load bids when buyer info is available
+    if (buyerEmail || buyerName) {
+      loadBids();
+    } else {
+      setLoading(false);
+    }
+  }, [buyerEmail, buyerName, loadBids]);
 
   const handleViewBid = async (bid: Bid) => {
     try {
@@ -190,7 +207,7 @@ const BuyerBidsHistory = () => {
       setEditLineItems([]);
     } catch (error) {
       console.error("Failed to update bid:", error);
-      alert("Failed to update bid. Please try again.");
+      alert("Failed to update PO. Please try again.");
     } finally {
       setActionLoading(false);
     }
@@ -224,7 +241,7 @@ const BuyerBidsHistory = () => {
       setEditLineItems([]);
     } catch (error) {
       console.error("Failed to resubmit bid:", error);
-      alert("Failed to resubmit bid. Please try again.");
+      alert("Failed to resubmit PO. Please try again.");
     } finally {
       setActionLoading(false);
     }
@@ -300,13 +317,13 @@ const BuyerBidsHistory = () => {
               <Link to="/buyer/bids">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Bid Builder
+                  PO Builder
                 </Button>
               </Link>
               <span className="text-border">|</span>
               <Button variant="ghost" className="text-primary font-medium">
                 <FileText className="w-4 h-4 mr-2" />
-                My Bids
+                My POs
               </Button>
             </div>
           </div>
@@ -351,17 +368,17 @@ const BuyerBidsHistory = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
-            My Bids
+            My POs
           </h1>
           <p className="text-muted-foreground mt-1">
-            View and manage all your submitted bid packages
+            View and manage all your submitted PO packages
           </p>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           {[
-            { label: 'Total Bids', value: bids.length, color: 'text-foreground' },
+            { label: 'Total POs', value: bids.length, color: 'text-foreground' },
             { label: 'Submitted', value: bids.filter(b => b.status === 'submitted').length, color: 'text-blue-600' },
             { label: 'Accepted', value: bids.filter(b => b.status === 'accepted').length, color: 'text-green-600' },
             { label: 'Countered', value: bids.filter(b => b.status === 'countered').length, color: 'text-purple-600' },
@@ -395,26 +412,26 @@ const BuyerBidsHistory = () => {
           </Button>
         </div>
 
-        {/* Bids Table */}
+        {/* POs Table */}
         <div className="rounded-xl bg-card border border-border overflow-hidden">
           {loading ? (
             <div className="p-12 text-center text-muted-foreground">
               <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin opacity-50" />
-              <p>Loading bids...</p>
+              <p>Loading POs...</p>
             </div>
           ) : filteredBids.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground">
               <FileText className="w-12 h-12 mx-auto mb-4 opacity-30" />
-              <p className="font-medium">No bids found</p>
+              <p className="font-medium">No POs found</p>
               <p className="text-sm mt-1">
                 {statusFilter === "all" 
-                  ? "You haven't submitted any bids yet" 
-                  : `No bids with status "${statusFilter}"`}
+                  ? "You haven't submitted any POs yet" 
+                  : `No POs with status "${statusFilter}"`}
               </p>
               <Link to="/buyer/bids">
                 <Button className="mt-4">
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Create New Bid
+                  Create New PO
                 </Button>
               </Link>
             </div>
@@ -422,7 +439,7 @@ const BuyerBidsHistory = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Bid #</TableHead>
+                  <TableHead>PO #</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
@@ -505,12 +522,12 @@ const BuyerBidsHistory = () => {
         </div>
       </main>
 
-      {/* View Bid Dialog */}
+      {/* View PO Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-xl">
-              Bid #{selectedBid?.id}
+              PO #{selectedBid?.id}
             </DialogTitle>
             <DialogDescription>
               Submitted to {selectedBid?.companyName}
@@ -614,17 +631,17 @@ const BuyerBidsHistory = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Bid Dialog */}
+      {/* Edit PO Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-xl">
-              Edit Bid #{selectedBid?.id}
+              Edit PO #{selectedBid?.id}
             </DialogTitle>
             <DialogDescription>
               {selectedBid?.status === 'countered' 
                 ? "Update your proposal based on the seller's counter offer. You can modify line items, pricing, and other details."
-                : "Update your bid details. Note: You cannot edit line items after submission."}
+                : "Update your PO details. Note: You cannot edit line items after submission."}
             </DialogDescription>
           </DialogHeader>
           
@@ -846,7 +863,7 @@ const BuyerBidsHistory = () => {
 
             <TabsContent value="notes" className="space-y-4 mt-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Bid Justification</label>
+                <label className="text-sm font-medium">PO Justification</label>
                 <Textarea
                   value={editForm.bidJustification}
                   onChange={(e) => setEditForm(prev => ({ ...prev, bidJustification: e.target.value }))}
@@ -889,7 +906,7 @@ const BuyerBidsHistory = () => {
                   ) : (
                     <Send className="w-4 h-4 mr-2" />
                   )}
-                  Resubmit Bid
+                  Resubmit PO
                 </Button>
               </>
             ) : (
@@ -912,10 +929,10 @@ const BuyerBidsHistory = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertCircle className="w-5 h-5" />
-              Cancel Bid
+              Cancel PO
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel Bid #{bidToCancel?.id}? This action cannot be undone.
+              Are you sure you want to cancel PO #{bidToCancel?.id}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           
@@ -928,7 +945,7 @@ const BuyerBidsHistory = () => {
 
           <DialogFooter className="mt-6">
             <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
-              Keep Bid
+              Keep PO
             </Button>
             <Button 
               variant="destructive" 
@@ -940,7 +957,7 @@ const BuyerBidsHistory = () => {
               ) : (
                 <X className="w-4 h-4 mr-2" />
               )}
-              Yes, Cancel Bid
+              Yes, Cancel PO
             </Button>
           </DialogFooter>
         </DialogContent>

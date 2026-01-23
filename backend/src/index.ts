@@ -6,7 +6,7 @@ import cors from 'cors';
 
 import companiesRouter from './routes/companies';
 import materialsRouter from './routes/materials';
-import bidsRouter from './routes/bids';
+import bidsRouter from './routes/pos';
 import aiRouter from './routes/ai';
 import statsRouter from './routes/stats';
 import authRouter from './routes/auth';

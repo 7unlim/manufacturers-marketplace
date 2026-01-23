@@ -140,6 +140,16 @@ export const fetchCompany = (id: number): Promise<Company> => {
   return fetch(`${baseUrl}/api/companies/${id}`).then(handleResponse);
 };
 
+export const createCompany = (
+  data: Partial<Company>
+): Promise<Company> => {
+  return fetch(`${baseUrl}/api/companies`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(handleResponse);
+};
+
 export const updateCompany = (
   id: number,
   data: Partial<Company>
@@ -356,6 +366,14 @@ export type SignUpPayload = {
   name: string;
   role: 'buyer' | 'seller';
   companyId?: number;
+  companyData?: {
+    name: string;
+    phone: string;
+    email: string;
+    location?: string;
+    description?: string;
+    certifications?: string[];
+  };
   onboarding?: OnboardingData;
 };
 

@@ -114,7 +114,7 @@ const SellerBids = () => {
     loadData();
   }, []);
 
-  const filteredBids = bids.filter(b => 
+  const filteredPOs = bids.filter(b => 
     statusFilter === "all" || b.status === statusFilter
   );
 
@@ -250,7 +250,7 @@ const SellerBids = () => {
               <span className="text-border">|</span>
               <Button variant="ghost" className="text-primary font-medium">
                 <Inbox className="w-4 h-4 mr-2" />
-                Bid Inbox
+                PO Inbox
               </Button>
             </div>
           </div>
@@ -296,10 +296,10 @@ const SellerBids = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
-              Bid Inbox
+              PO Inbox
             </h1>
             <p className="text-muted-foreground mt-1">
-              Review and respond to incoming bid requests
+              Review and respond to incoming PO requests
             </p>
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -307,7 +307,7 @@ const SellerBids = () => {
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Bids</SelectItem>
+              <SelectItem value="all">All POs</SelectItem>
               <SelectItem value="submitted">Response Needed</SelectItem>
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="accepted">Accepted</SelectItem>
@@ -316,23 +316,23 @@ const SellerBids = () => {
           </Select>
         </div>
 
-        {/* Bids Table */}
+        {/* POs Table */}
         <div className="rounded-xl border border-border bg-card overflow-hidden shadow-md">
           {loading ? (
             <div className="h-64 flex items-center justify-center text-muted-foreground">
-              Loading bids...
+              Loading POs...
             </div>
-          ) : filteredBids.length === 0 ? (
+          ) : filteredPOs.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground">
               <Inbox className="w-16 h-16 mx-auto mb-4 opacity-30" />
-              <p className="text-lg font-medium">No bids found</p>
-              <p className="text-sm">Bid requests from buyers will appear here</p>
+              <p className="text-lg font-medium">No POs found</p>
+              <p className="text-sm">PO requests from buyers will appear here</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead className="font-display font-semibold text-foreground">Bid #</TableHead>
+                  <TableHead className="font-display font-semibold text-foreground">PO #</TableHead>
                   <TableHead className="font-display font-semibold text-foreground">Buyer</TableHead>
                   <TableHead className="font-display font-semibold text-foreground">Total Amount</TableHead>
                   <TableHead className="font-display font-semibold text-foreground">Date</TableHead>
@@ -341,7 +341,7 @@ const SellerBids = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBids.map((bid, index) => (
+                {filteredPOs.map((bid, index) => (
                   <TableRow 
                     key={bid.id}
                     className="hover:bg-muted/30 transition-colors"
@@ -378,11 +378,11 @@ const SellerBids = () => {
 
         {/* Results info */}
         <div className="mt-4 text-sm text-muted-foreground">
-          Showing {filteredBids.length} of {bids.length} bids
+          Showing {filteredPOs.length} of {bids.length} bids
         </div>
       </main>
 
-      {/* Bid Details Dialog */}
+      {/* PO Details Dialog */}
       <Dialog
         open={!!selectedBid}
         onOpenChange={(open) => {
@@ -399,7 +399,7 @@ const SellerBids = () => {
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
-              <span>Bid #{selectedBid?.id}</span>
+              <span>PO #{selectedBid?.id}</span>
               {selectedBid && (
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(selectedBid.status)}`}>
                   {getStatusLabel(selectedBid.status)}
@@ -412,7 +412,7 @@ const SellerBids = () => {
           </DialogHeader>
           
           {loadingBid ? (
-            <div className="py-8 text-center text-muted-foreground">Loading bid details...</div>
+            <div className="py-8 text-center text-muted-foreground">Loading PO details...</div>
           ) : selectedBid && (
             <div className="overflow-y-auto flex-1 -mx-6 px-6">
               <Tabs
@@ -621,7 +621,7 @@ const SellerBids = () => {
                             size="lg"
                           >
                             <Check className="w-4 h-4 mr-2" />
-                            Accept Bid
+                            Accept PO
                           </Button>
                           <Button 
                             variant="outline" 
@@ -631,7 +631,7 @@ const SellerBids = () => {
                             size="lg"
                           >
                             <X className="w-4 h-4 mr-2" />
-                            Decline Bid
+                            Decline PO
                           </Button>
                         </div>
 

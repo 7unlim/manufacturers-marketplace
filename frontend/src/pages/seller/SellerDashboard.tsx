@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
 import { 
   Package, Building2, ChevronDown, LogOut, Settings, User, 
-  Factory, Inbox, TrendingUp, DollarSign, Info, Users, Target, Star, Edit, Mail, Phone, AlertCircle, MessageSquare, Send
+  Factory, Inbox, TrendingUp, DollarSign, Info, Users, Target, Star, Edit, Mail, Phone, AlertCircle, MessageSquare, Send, Search, Plus
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -26,12 +26,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
-import { fetchCompanies, fetchMaterials, fetchBids, updateCompany, fetchRevenueData, fetchBuyerLeads, sendMessage, type Company, type Material, type Bid, type RevenueResponse, type BuyerLead, type OnboardingData } from "@/lib/api";
+import { fetchCompanies, fetchMaterials, fetchBids, updateCompany, fetchRevenueData, fetchBuyerLeads, sendMessage, fetchConversations, fetchMessages, markMessagesAsRead, type Company, type Material, type Bid, type RevenueResponse, type BuyerLead, type OnboardingData, type Conversation, type Message } from "@/lib/api";
+import { formatDistanceToNow } from "date-fns";
 
 const SellerDashboard = () => {
   const [company, setCompany] = useState<Company | null>(null);
@@ -54,6 +63,14 @@ const SellerDashboard = () => {
   const [messageText, setMessageText] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
   const [showAllRecommended, setShowAllRecommended] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Debug: Track buyerLeads changes
   useEffect(() => {
@@ -63,6 +80,107 @@ const SellerDashboard = () => {
       sampleEmails: buyerLeads.slice(0, 3).map(b => b?.email)
     });
   }, [buyerLeads]);
+
+  // Load conversations for seller inbox
+  useEffect(() => {
+    if (sellerEmail) {
+      loadConversations();
+      const interval = setInterval(() => {
+        loadConversations();
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [sellerEmail]);
+
+  // Load messages when conversation is selected
+  useEffect(() => {
+    if (selectedConversation && sellerEmail) {
+      const load = async () => {
+        try {
+          await loadMessages(selectedConversation);
+          await markMessagesAsRead(sellerEmail, selectedConversation);
+        } catch (error) {
+          console.error("Error loading messages:", error);
+        }
+      };
+      load();
+      const interval = setInterval(() => {
+        load();
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedConversation, sellerEmail]);
+
+  // Auto-scroll to bottom of messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const loadConversations = async () => {
+    if (!sellerEmail) return;
+    try {
+      const convs = await fetchConversations(sellerEmail);
+      setConversations(convs || []);
+    } catch (error) {
+      console.error("Failed to load conversations:", error);
+      setConversations([]);
+    }
+  };
+
+  const loadMessages = async (otherEmail: string) => {
+    if (!sellerEmail) return;
+    try {
+      const msgs = await fetchMessages(sellerEmail, otherEmail);
+      setMessages(msgs);
+    } catch (error) {
+      console.error("Failed to load messages:", error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedConversation || !sellerEmail || !company) {
+      return;
+    }
+
+    const conversation = conversations.find(c => c && c.otherEmail === selectedConversation);
+    if (!conversation || !conversation.otherName || !conversation.otherRole) {
+      console.error("Conversation not found or invalid", { selectedConversation, conversations });
+      return;
+    }
+
+    setSending(true);
+    try {
+      await sendMessage({
+        senderEmail: sellerEmail,
+        senderName: company.name,
+        senderRole: "seller",
+        recipientEmail: selectedConversation,
+        recipientName: conversation.otherName,
+        recipientRole: conversation.otherRole as "buyer" | "seller",
+        content: newMessage.trim(),
+      });
+      setNewMessage("");
+      await loadMessages(selectedConversation);
+      await loadConversations();
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      alert("Failed to send message. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const filteredConversations = conversations.filter(conv => {
+    if (!conv || !searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      conv.otherName?.toLowerCase().includes(search) ||
+      conv.otherEmail?.toLowerCase().includes(search) ||
+      conv.lastMessage?.toLowerCase().includes(search)
+    );
+  });
+
+  const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
 
   // Function to refresh onboarding data from localStorage
   const refreshOnboardingData = useCallback(() => {
@@ -244,7 +362,6 @@ const SellerDashboard = () => {
         period: chartPeriod,
         data: [],
         totalRevenue: 0,
-        periodTotalRevenue: 0,
         revenueChange: 0,
         totalBids: 0,
       });
@@ -264,7 +381,6 @@ const SellerDashboard = () => {
           period: chartPeriod,
           data: [],
           totalRevenue: 0,
-          periodTotalRevenue: 0,
           revenueChange: 0,
           totalBids: 0,
         });
@@ -396,7 +512,6 @@ const SellerDashboard = () => {
       accepted: "bg-green-500/10 text-green-600",
       rejected: "bg-destructive/10 text-destructive",
       countered: "bg-purple-500/10 text-purple-600",
-      cancelled: "bg-muted text-muted-foreground",
     };
     return styles[status] || styles.draft;
   };
@@ -408,7 +523,6 @@ const SellerDashboard = () => {
       accepted: "Accepted",
       rejected: "Rejected",
       countered: "Countered",
-      cancelled: "Cancelled",
     };
     return labels[status] ?? status;
   };
@@ -487,7 +601,7 @@ const SellerDashboard = () => {
               <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
                 <Factory className="w-5 h-5 text-accent-foreground" />
               </div>
-              <span className="font-display font-bold text-xl text-slate-900">Marketplace</span>
+              <span className="font-display font-bold text-xl text-slate-900">Waypoint</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Seller</span>
             </Link>
 
@@ -507,22 +621,194 @@ const SellerDashboard = () => {
               <Link to="/seller/bids">
                 <Button variant="ghost" className="text-slate-600 hover:text-slate-900">
                   <Inbox className="w-4 h-4 mr-2" />
-                  Bid Inbox
+                  PO Inbox
                 </Button>
               </Link>
             </div>
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-3 px-3">
-                <span className="text-sm font-medium">{company?.name || accountName || "Seller Account"}</span>
-                <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center">
-                  <User className="w-5 h-5 text-accent-foreground" />
+          <div className="flex items-center gap-2">
+            <Sheet open={inboxOpen} onOpenChange={setInboxOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" className="relative">
+                  <Inbox className="w-5 h-5" />
+                  {totalUnread > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-white text-xs rounded-full flex items-center justify-center">
+                      {totalUnread > 9 ? '9+' : totalUnread}
+                    </span>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
+                <SheetHeader className="flex-shrink-0">
+                  <SheetTitle>Messages</SheetTitle>
+                  <SheetDescription>
+                    Connect with buyers and manage your conversations
+                  </SheetDescription>
+                </SheetHeader>
+                
+                <div className="flex-1 flex flex-col min-h-0 mt-6 space-y-4">
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search conversations..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {!selectedConversation ? (
+                      <div className="flex-1 overflow-y-auto space-y-2">
+                        {filteredConversations.length === 0 ? (
+                          <div className="p-8 text-center text-muted-foreground">
+                            <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                            <p>No messages yet</p>
+                            <p className="text-sm mt-2">Start a conversation with a buyer</p>
+                          </div>
+                        ) : (
+                          filteredConversations.map((conv) => {
+                            if (!conv || !conv.otherEmail) return null;
+                            const initials = (conv.otherName || "U").split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                            return (
+                              <button
+                                key={conv.otherEmail}
+                                onClick={() => {
+                                  setSelectedConversation(conv.otherEmail);
+                                }}
+                                className={`w-full p-4 text-left rounded-lg border transition-colors ${
+                                  selectedConversation === conv.otherEmail 
+                                    ? "bg-primary/5 border-primary" 
+                                    : "bg-card border-border hover:bg-muted/50"
+                                }`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${
+                                    conv.unreadCount > 0 
+                                      ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground' 
+                                      : 'bg-muted text-muted-foreground'
+                                  }`}>
+                                    {initials}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                      <p className="font-semibold text-sm text-foreground truncate">
+                                        {conv.otherName || "Unknown"}
+                                      </p>
+                                      {conv.unreadCount > 0 && (
+                                        <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs flex-shrink-0">
+                                          {conv.unreadCount}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground truncate mb-1">
+                                      {conv.lastMessage || "No message"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {conv.lastMessageTime ? (() => {
+                                        try {
+                                          return formatDistanceToNow(new Date(conv.lastMessageTime), { addSuffix: true });
+                                        } catch {
+                                          return 'Recently';
+                                        }
+                                      })() : 'Just now'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col min-h-0 border-t pt-4 mt-4">
+                        <div className="mb-3 flex-shrink-0">
+                          <p className="font-semibold text-foreground">
+                            {conversations.find(c => c.otherEmail === selectedConversation)?.otherName || "Conversation"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {conversations.find(c => c.otherEmail === selectedConversation)?.otherEmail}
+                          </p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-3 mb-3 p-3 bg-muted/30 rounded-lg min-h-0">
+                          {messages.map((msg) => {
+                            const isSender = msg.senderEmail === sellerEmail;
+                            return (
+                              <div
+                                key={msg.id}
+                                className={`flex ${isSender ? "justify-end" : "justify-start"}`}
+                              >
+                                <div
+                                  className={`max-w-[75%] rounded-lg px-3 py-2 ${
+                                    isSender
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-card text-foreground border border-border"
+                                  }`}
+                                >
+                                  <p className="text-sm whitespace-pre-wrap break-words">
+                                    {msg.content}
+                                  </p>
+                                  <p
+                                    className={`text-xs mt-1 ${
+                                      isSender
+                                        ? "text-primary-foreground/70"
+                                        : "text-muted-foreground"
+                                    }`}
+                                  >
+                                    {msg.createdAt ? (() => {
+                                      try {
+                                        return formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true });
+                                      } catch {
+                                        return 'Just now';
+                                      }
+                                    })() : 'Just now'}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div ref={messagesEndRef} />
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0 pt-2">
+                          <Input
+                            placeholder="Type a message..."
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage();
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={handleSendMessage}
+                            disabled={!newMessage.trim() || sending}
+                          >
+                            <Send className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
+              </SheetContent>
+            </Sheet>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-3 px-3">
+                  <span className="text-sm font-medium">{company?.name || accountName || "Seller Account"}</span>
+                  <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center">
+                    <User className="w-5 h-5 text-accent-foreground" />
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem asChild>
                 <Link to="/seller/profile" className="flex items-center">
@@ -545,6 +831,7 @@ const SellerDashboard = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </nav>
 
@@ -564,7 +851,7 @@ const SellerDashboard = () => {
                     Welcome back, {company?.name || accountName || "Seller"}
                   </h1>
                   <p className="text-slate-600 mt-1">
-                    Here's an overview of your materials, bids, and potential buyers
+                    Here's an overview of your materials, POs, and potential buyers
                   </p>
                 </div>
                 {!sellerOnboarding && (
@@ -743,6 +1030,7 @@ const SellerDashboard = () => {
                                 size="sm" 
                                 className="w-full"
                                 onClick={() => {
+                                  console.log('Message Buyer button clicked', { buyer, sellerEmail, company });
                                   setSelectedBuyer(buyer);
                                   setMessageDialogOpen(true);
                                 }}
@@ -995,12 +1283,116 @@ const SellerDashboard = () => {
             </div>
 
             {/* Two Column Layout */}
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Compact Inbox */}
+              <Card className="lg:col-span-1 border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader className="pb-4 border-b border-border/50">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                        <Inbox className="w-5 h-5 text-primary" />
+                      </div>
+                      <span>Messages</span>
+                      {totalUnread > 0 && (
+                        <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs ml-1.5">
+                          {totalUnread}
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setInboxOpen(true)}
+                      className="text-primary hover:text-primary/80 hover:bg-primary/5"
+                    >
+                      View All
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="max-h-[450px] overflow-y-auto">
+                    {conversations.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                          <MessageSquare className="w-8 h-8 text-muted-foreground opacity-40" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground mb-1">No messages yet</p>
+                        <p className="text-xs text-muted-foreground mb-4">Start conversations with buyers</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border/50">
+                        {conversations.slice(0, 5).map((conv) => {
+                          if (!conv || !conv.otherEmail) return null;
+                          const initials = (conv.otherName || "U").split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                          return (
+                            <button
+                              key={conv.otherEmail}
+                              onClick={() => {
+                                setSelectedConversation(conv.otherEmail);
+                                setInboxOpen(true);
+                              }}
+                              className={`w-full p-4 text-left hover:bg-muted/50 transition-all duration-200 ${
+                                selectedConversation === conv.otherEmail ? "bg-primary/5 border-l-2 border-l-primary" : ""
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${
+                                  conv.unreadCount > 0 
+                                    ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground' 
+                                    : 'bg-muted text-muted-foreground'
+                                }`}>
+                                  {initials}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <p className="font-semibold text-sm text-foreground truncate">
+                                      {conv.otherName || "Unknown"}
+                                    </p>
+                                    {conv.unreadCount > 0 && (
+                                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs flex-shrink-0">
+                                        {conv.unreadCount}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground truncate mb-1">
+                                    {conv.lastMessage || "No message"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {conv.lastMessageTime ? (() => {
+                                      try {
+                                        return formatDistanceToNow(new Date(conv.lastMessageTime), { addSuffix: true });
+                                      } catch {
+                                        return 'Recently';
+                                      }
+                                    })() : 'Just now'}
+                                  </p>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  {conversations.length > 5 && (
+                    <div className="p-4 border-t border-border/50 bg-muted/20">
+                      <Button 
+                        variant="ghost" 
+                        className="w-full text-sm font-medium"
+                        onClick={() => setInboxOpen(true)}
+                      >
+                        View {conversations.length - 5} more conversation{conversations.length - 5 !== 1 ? 's' : ''}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Recent Bids */}
               <Card className="border-0 shadow-lg">
                 <CardHeader className="border-b border-slate-200">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Recent Bids</CardTitle>
+                    <CardTitle className="text-lg">Recent POs</CardTitle>
                     <Link to="/seller/bids">
                       <Button variant="ghost" size="sm">View All</Button>
                     </Link>
@@ -1218,21 +1610,83 @@ const SellerDashboard = () => {
                 </Button>
                 <Button
                   onClick={async () => {
-                    if (!messageText.trim() || !sellerEmail || !company || !selectedBuyer) return;
+                    console.log('Send message button clicked', { 
+                      messageText: messageText.trim(), 
+                      sellerEmail, 
+                      company, 
+                      selectedBuyer,
+                      accountName,
+                      hasMessage: !!messageText.trim(),
+                      hasEmail: !!sellerEmail,
+                      hasCompany: !!company,
+                      hasBuyer: !!selectedBuyer
+                    });
+                    
+                    if (!messageText.trim()) {
+                      alert("Please enter a message");
+                      return;
+                    }
+                    if (!sellerEmail) {
+                      alert("Seller email not found. Please sign in again.");
+                      return;
+                    }
+                    if (!selectedBuyer) {
+                      alert("Buyer information not found.");
+                      return;
+                    }
+                    
+                    // Get company name from company object or account name as fallback
+                    let senderName = company?.name || accountName || "Seller";
+                    
+                    // Try to get company name from localStorage if company object is not available
+                    if (!senderName || senderName === "Seller") {
+                      try {
+                        const authAccount = localStorage.getItem("authAccount");
+                        if (authAccount) {
+                          const account = JSON.parse(authAccount);
+                          if (account.company?.name) {
+                            senderName = account.company.name;
+                          } else if (account.name) {
+                            senderName = account.name;
+                          }
+                        }
+                      } catch (error) {
+                        console.error("Error getting company name from localStorage:", error);
+                      }
+                    }
+                    
+                    if (!senderName || senderName === "Seller") {
+                      alert("Company name not found. Please sign in again.");
+                      return;
+                    }
+                    
                     setSendingMessage(true);
                     try {
+                      console.log('Sending message...', {
+                        senderEmail: sellerEmail,
+                        senderName: senderName,
+                        recipientEmail: selectedBuyer.email,
+                        content: messageText.trim()
+                      });
+                      
                       await sendMessage({
                         senderEmail: sellerEmail,
-                        senderName: company.name,
+                        senderName: senderName,
                         senderRole: "seller",
                         recipientEmail: selectedBuyer.email,
                         recipientName: selectedBuyer.name,
                         recipientRole: "buyer",
                         content: messageText.trim(),
                       });
+                      
+                      console.log('Message sent successfully');
                       setMessageDialogOpen(false);
                       setMessageText("");
                       setSelectedBuyer(null);
+                      // Reload conversations to show the new message
+                      if (sellerEmail) {
+                        loadConversations();
+                      }
                       alert("Message sent successfully! The buyer will see it in their inbox.");
                     } catch (error) {
                       console.error("Failed to send message:", error);
